@@ -508,6 +508,307 @@ body.fallback-start #fallback-start {
 }());
 		</script>
 		$GODOT_HEAD_INCLUDE
+		<style>
+/* ---------- Fallback HUD (only shown if the engine's own UI is not drawn) ---------- */
+#hud {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	pointer-events: none;
+}
+
+#hud[hidden] {
+	display: none;
+}
+
+#hud-stage {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 1920px;
+	height: 1080px;
+	transform-origin: 0 0;
+	pointer-events: none;
+	font-family: Arial, 'Segoe UI', Roboto, system-ui, sans-serif;
+}
+
+#hud .hud-panel {
+	position: absolute;
+	background: rgba(0, 0, 0, 0.55);
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+#hud button {
+	appearance: none;
+	border: 2px solid rgba(255, 255, 255, 0.35);
+	color: #fff;
+	font-weight: 700;
+	border-radius: 12px;
+	pointer-events: auto;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+	-webkit-tap-highlight-color: transparent;
+	touch-action: manipulation;
+	font-family: inherit;
+}
+
+#hud-score {
+	left: 30px;
+	top: 24px;
+	width: 360px;
+	height: 100px;
+	border-radius: 14px;
+	border: 2px solid rgba(255, 217, 51, 0.5);
+	box-sizing: border-box;
+}
+
+#hud-score-text {
+	position: absolute;
+	left: 20px;
+	top: 8px;
+	width: 320px;
+	height: 46px;
+	line-height: 46px;
+	font-size: 32px;
+	font-weight: 700;
+	color: #ffd933;
+}
+
+#hud-coins {
+	position: absolute;
+	left: 24px;
+	top: 58px;
+	height: 30px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+#hud-coin-dot {
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	background: #ffd140;
+	border: 2px solid rgba(255, 255, 255, 0.5);
+	box-sizing: border-box;
+}
+
+#hud-coins-text {
+	font-size: 26px;
+	font-weight: 700;
+	color: #fff;
+}
+
+#hud-health {
+	left: 1470px;
+	top: 24px;
+	width: 420px;
+	height: 44px;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	box-sizing: border-box;
+	overflow: hidden;
+}
+
+#hud-health-fill {
+	position: absolute;
+	left: 44px;
+	top: 8px;
+	width: 332px;
+	height: 28px;
+	background: #40d95f;
+}
+
+#hud-health .hud-cap {
+	position: absolute;
+	top: 8px;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	border: 2px solid rgba(255, 255, 255, 0.5);
+	box-sizing: border-box;
+}
+
+#hud-health .hud-cap.green {
+	left: 8px;
+	background: #59e666;
+}
+
+#hud-health .hud-cap.red {
+	right: 8px;
+	background: #ff4d4d;
+}
+
+#hud-pause {
+	position: absolute;
+	left: 1810px;
+	top: 80px;
+	width: 70px;
+	height: 50px;
+	font-size: 22px;
+	background: rgba(51, 51, 82, 0.9);
+}
+
+#hud-start {
+	position: absolute;
+	left: 860px;
+	top: 470px;
+	width: 200px;
+	height: 90px;
+	font-size: 34px;
+	background: #33bf66;
+}
+
+.hud-dim {
+	position: absolute;
+	inset: 0;
+	pointer-events: auto;
+}
+
+#hud-paused {
+	background: rgba(0, 0, 0, 0.55);
+}
+
+#hud-over {
+	background: rgba(0, 0, 0, 0.5);
+}
+
+#hud-question {
+	background: rgba(0, 0, 0, 0.6);
+}
+
+#hud-paused .hud-title {
+	position: absolute;
+	left: 660px;
+	top: 340px;
+	width: 600px;
+	height: 130px;
+	line-height: 130px;
+	text-align: center;
+	font-size: 100px;
+	font-weight: 700;
+	color: #fff;
+}
+
+#hud-resume {
+	position: absolute;
+	left: 810px;
+	top: 540px;
+	width: 300px;
+	height: 90px;
+	font-size: 36px;
+	background: #33cc66;
+}
+
+#hud-over .hud-title {
+	position: absolute;
+	left: 560px;
+	top: 260px;
+	width: 800px;
+	height: 150px;
+	line-height: 150px;
+	text-align: center;
+	font-size: 108px;
+	font-weight: 700;
+	color: #f22626;
+}
+
+#hud-final {
+	position: absolute;
+	left: 660px;
+	top: 440px;
+	width: 600px;
+	height: 70px;
+	line-height: 70px;
+	text-align: center;
+	font-size: 44px;
+	font-weight: 700;
+	color: #fff;
+}
+
+#hud-revive {
+	position: absolute;
+	left: 760px;
+	top: 540px;
+	width: 400px;
+	height: 90px;
+	font-size: 36px;
+	background: #33cc66;
+}
+
+#hud-restart {
+	position: absolute;
+	left: 760px;
+	top: 650px;
+	width: 400px;
+	height: 80px;
+	font-size: 30px;
+	background: #33b3e6;
+}
+
+#hud-question-panel {
+	position: absolute;
+	left: 360px;
+	top: 90px;
+	width: 1200px;
+	height: 900px;
+	box-sizing: border-box;
+	border-radius: 26px;
+	background: rgba(13, 20, 41, 0.96);
+	border: 3px solid rgba(77, 217, 255, 0.8);
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+#hud-q-title {
+	position: absolute;
+	left: 0;
+	top: 34px;
+	width: 1200px;
+	height: 70px;
+	line-height: 70px;
+	text-align: center;
+	font-size: 52px;
+	font-weight: 700;
+	color: #59ebff;
+}
+
+#hud-q-text {
+	position: absolute;
+	left: 70px;
+	top: 140px;
+	width: 1060px;
+	height: 190px;
+	font-size: 30px;
+	color: #fff;
+	text-align: center;
+	direction: rtl;
+	font-family: Tahoma, Arial, sans-serif;
+}
+
+#hud-q-time {
+	position: absolute;
+	left: 0;
+	top: 330px;
+	width: 1200px;
+	height: 56px;
+	line-height: 56px;
+	text-align: center;
+	font-size: 36px;
+	font-weight: 700;
+	color: #ffa633;
+}
+
+.hud-option {
+	position: absolute;
+	left: 120px;
+	width: 960px;
+	height: 92px;
+	font-size: 27px;
+	padding: 0 18px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+		</style>
 	</head>
 	<body>
 		<canvas id="canvas">
@@ -576,6 +877,43 @@ body.fallback-start #fallback-start {
 		</div>
 
 		<button id="fallback-start" type="button">START</button>
+
+		<div id="hud" hidden>
+			<div id="hud-stage">
+				<div id="hud-score" class="hud-panel" hidden>
+					<div id="hud-score-text">SCORE: 0</div>
+					<div id="hud-coins">
+						<span id="hud-coin-dot"></span>
+						<span id="hud-coins-text">x 0</span>
+					</div>
+				</div>
+				<div id="hud-health" class="hud-panel">
+					<span class="hud-cap green"></span>
+					<div id="hud-health-fill"></div>
+					<span class="hud-cap red"></span>
+				</div>
+				<button id="hud-pause" type="button" hidden>II</button>
+				<button id="hud-start" type="button" hidden>START</button>
+				<div id="hud-paused" class="hud-dim" hidden>
+					<div class="hud-title">PAUSED</div>
+					<button id="hud-resume" type="button">RESUME</button>
+				</div>
+				<div id="hud-over" class="hud-dim" hidden>
+					<div class="hud-title">GAME OVER</div>
+					<div id="hud-final">Final Score: 0</div>
+					<button id="hud-revive" type="button">REVIVE</button>
+					<button id="hud-restart" type="button">RESTART</button>
+				</div>
+				<div id="hud-question" class="hud-dim" hidden>
+					<div id="hud-question-panel">
+						<div id="hud-q-title">HEALTH CHECK</div>
+						<div id="hud-q-text" dir="rtl"></div>
+						<div id="hud-q-time">TIME: 15</div>
+						<div id="hud-q-options"></div>
+					</div>
+				</div>
+			</div>
+		</div>
 
 		<div id="diag" role="dialog" aria-label="Diagnostics">
 			<h2 id="diag-title">
@@ -961,7 +1299,7 @@ const engine = new Engine(GODOT_CONFIG);
    It opens by itself when the game reports a broken UI, with ?diag=1, or via
    three quick taps in the top-left corner. */
 (function () {
-	const SHELL_VERSION = '2026-10-27.f';
+	const SHELL_VERSION = '2026-10-27.g';
 	const state = window.__khotwaState || (window.__khotwaState = { startedAt: Date.now(), errors: 0, boot: null, probe: null });
 	const panel = document.getElementById('diag');
 	const body = document.getElementById('diag-body');
@@ -1085,6 +1423,7 @@ const engine = new Engine(GODOT_CONFIG);
 			' | render: ' + (p.method || '?') + ' / ' + (p.driver || '?'));
 		lines.push('gpu (godot): ' + (p.adapter || '?') + ' / ' + (p.vendor || '?'));
 		lines.push('ui: ' + (p.ui_present ? 'present, ' + p.ui_children + ' controls' : 'MISSING') +
+			' | drawn: ' + (p.ui_drawn === false ? 'NO - HTML HUD active' : 'yes') +
 			' | state: ' + (p.game_state === null || p.game_state === undefined ? '?' : p.game_state) +
 			' | fps: ' + (p.fps === undefined ? 'n/a' : p.fps));
 		const rect = (r) => r ? [r[0], r[1], r[2], r[3]].join(',') : 'n/a';
@@ -1243,7 +1582,7 @@ const engine = new Engine(GODOT_CONFIG);
 			}
 		}
 		// In-game the fallback button is pointless; keep it only for the menu.
-		setFallback(inMenu && (p.ui_present === false || brokenStart));
+		setFallback(inMenu && !state.hudActive && (p.ui_present === false || brokenStart));
 		if (brokenStart) {
 			state.startBroken = true;
 		}
@@ -1389,6 +1728,121 @@ const engine = new Engine(GODOT_CONFIG);
 			}
 		}
 	}, true);
+}());
+		</script>
+		<script>
+/* Fallback HUD. It is hidden unless the engine reports that its own UI layer
+   draws nothing (see web_support.gd). Everything it shows comes from the real
+   game state, and every button calls back into the real game manager. */
+(function () {
+	const hud = document.getElementById('hud');
+	if (!hud) {
+		return;
+	}
+	const stage = document.getElementById('hud-stage');
+	const score = document.getElementById('hud-score');
+	const scoreText = document.getElementById('hud-score-text');
+	const coinsText = document.getElementById('hud-coins-text');
+	const pauseBtn = document.getElementById('hud-pause');
+	const startBtn = document.getElementById('hud-start');
+	const paused = document.getElementById('hud-paused');
+	const over = document.getElementById('hud-over');
+	const finalText = document.getElementById('hud-final');
+	const question = document.getElementById('hud-question');
+	const qText = document.getElementById('hud-q-text');
+	const qTime = document.getElementById('hud-q-time');
+	const qOptions = document.getElementById('hud-q-options');
+	const healthFill = document.getElementById('hud-health-fill');
+	let optionKey = '';
+
+	function layout() {
+		const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+		const x = (window.innerWidth - 1920 * s) / 2;
+		const y = (window.innerHeight - 1080 * s) / 2;
+		stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
+	}
+	layout();
+	window.addEventListener('resize', layout);
+	window.addEventListener('orientationchange', layout);
+
+	function act(action, value) {
+		try {
+			if (typeof window.__khotwaAction === 'function') {
+				window.__khotwaAction(action, value === undefined ? 0 : value);
+			}
+		} catch (err) {
+			/* The game may not be ready yet; ignore. */
+		}
+	}
+
+	startBtn.addEventListener('click', () => act('start'));
+	pauseBtn.addEventListener('click', () => act('pause'));
+	document.getElementById('hud-resume').addEventListener('click', () => act('resume'));
+	document.getElementById('hud-revive').addEventListener('click', () => act('revive'));
+	document.getElementById('hud-restart').addEventListener('click', () => act('restart'));
+
+	function show(el, on) {
+		if (el) {
+			el.hidden = !on;
+		}
+	}
+
+	function fmt(n) {
+		return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+	}
+
+	function renderOptions(options) {
+		const key = JSON.stringify(options);
+		if (key === optionKey) {
+			return;
+		}
+		optionKey = key;
+		qOptions.textContent = '';
+		const colors = ['#33b871', '#388ce6', '#f39e33', '#ad5ceb'];
+		const letters = ['أ', 'ب', 'ج', 'د'];
+		options.slice(0, 4).forEach((text, i) => {
+			const button = document.createElement('button');
+			button.type = 'button';
+			button.className = 'hud-option';
+			button.style.top = (400 + i * 108) + 'px';
+			button.style.background = colors[i];
+			button.dir = 'rtl';
+			button.textContent = letters[i] + ') ' + text;
+			button.addEventListener('click', () => act('answer', i));
+			qOptions.appendChild(button);
+		});
+	}
+
+	window.__khotwaHud = function (data) {
+		if (!data) {
+			return;
+		}
+		hud.hidden = false;
+		window.__khotwaState = window.__khotwaState || {};
+		window.__khotwaState.hudActive = true;
+		layout();
+		const state = data.state;
+		show(score, state === 1 || state === 4);
+		show(pauseBtn, state === 1);
+		show(startBtn, state === 0);
+		show(paused, state === 2 && !data.question);
+		show(over, state === 4 && !data.question);
+		show(question, !!data.question);
+		scoreText.textContent = 'SCORE: ' + fmt(data.score || 0);
+		coinsText.textContent = 'x ' + fmt(data.coins || 0);
+		finalText.textContent = 'Final Score: ' + fmt(data.score || 0);
+		const max = Math.max(1, data.max_health || 100);
+		const ratio = Math.max(0, Math.min(1, (data.health || 0) / max));
+		healthFill.style.width = (332 * ratio) + 'px';
+		healthFill.style.background = ratio > 0.5 ? '#40d95f' : (ratio > 0.25 ? '#f2cc33' : '#e63333');
+		if (data.question) {
+			qText.textContent = data.question_text || '';
+			qTime.textContent = 'TIME: ' + (data.time === undefined ? 15 : data.time);
+			renderOptions(data.options || []);
+		} else {
+			optionKey = '';
+		}
+	};
 }());
 		</script>
 	</body>

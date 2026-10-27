@@ -12,7 +12,10 @@ var _pressed: bool = false
 var _press_position: Vector2 = Vector2.ZERO
 var _js_start_callback: Variant = null
 var _js_ping_callback: Variant = null
+var _js_action_callback: Variant = null
 var _ui_healed: bool = false
+var _ui_checked: bool = false
+var _ui_drawn: bool = true
 var _tick: float = 0.0
 var _question_override: bool = false
 
@@ -27,6 +30,8 @@ func _ready() -> void:
 	_report("boot")
 	for delay in [0.75, 2.5, 6.0, 12.0, 20.0]:
 		await get_tree().create_timer(delay).timeout
+		if delay == 2.5:
+			await _verify_ui_drawn()
 		_report("late")
 
 
@@ -38,6 +43,8 @@ func _process(delta: float) -> void:
 		return
 	_tick = 0.0
 	_keep_ui_alive()
+	if _ui_checked and not _ui_drawn:
+		_push_hud()
 
 
 func _manager() -> Node:
@@ -67,6 +74,28 @@ func _register_js_start() -> void:
 	JavaScriptBridge.get_interface("window").__khotwaStart = _js_start_callback
 	_js_ping_callback = JavaScriptBridge.create_callback(_on_js_ping)
 	JavaScriptBridge.get_interface("window").__khotwaPing = _js_ping_callback
+	_js_action_callback = JavaScriptBridge.create_callback(_on_js_action)
+	JavaScriptBridge.get_interface("window").__khotwaAction = _js_action_callback
+
+
+func _on_js_action(args: Array) -> void:
+	var manager: Node = _manager()
+	if manager == null:
+		return
+	var action: String = str(args[0]) if args.size() > 0 else ""
+	match action:
+		"start":
+			manager.call("start_game")
+		"pause":
+			manager.call("pause_game")
+		"resume":
+			manager.call("resume_game")
+		"revive":
+			manager.call("ask_revival_question")
+		"restart":
+			manager.call("restart_game")
+		"answer":
+			manager.call("submit_answer", int(args[1]) if args.size() > 1 else 0)
 
 
 func _on_js_ping(_args: Array) -> void:
@@ -222,6 +251,102 @@ func _connect_once(manager: Node, signal_name: String, method_name: String) -> v
 	_ui_healed = true
 
 
+## Decides whether the game's own UI really reaches the screen. Two frames are
+## grabbed with the whole tree paused: one with the UI layer visible and one with
+## it hidden. If the frames are pixel-identical the layer draws nothing, which is
+## exactly what the failing phones show, and the HTML HUD takes over.
+func _verify_ui_drawn() -> void:
+	if _ui_checked:
+		return
+	var ui: Node = _ui_node()
+	if ui == null or not (ui is CanvasLayer):
+		return
+	_ui_checked = true
+	var diff: float = await _ui_visibility_diff(ui)
+	if diff < 0.0:
+		_ui_drawn = true
+		return
+	_ui_drawn = diff > 0.0005
+	if not _ui_drawn:
+		_ui_healed = true
+
+
+func _ui_visibility_diff(hider: Node) -> float:
+	get_tree().paused = true
+	await _wait_frames(4)
+	var shown: Image = await _snapshot()
+	hider.visible = false
+	await _wait_frames(6)
+	var hidden: Image = await _snapshot()
+	hider.visible = true
+	get_tree().paused = false
+	return _difference(shown, hidden)
+
+
+func _wait_frames(count: int) -> void:
+	for i in range(count):
+		await RenderingServer.frame_post_draw
+
+
+func _snapshot() -> Image:
+	var image: Image = get_viewport().get_texture().get_image()
+	if image == null or image.is_empty():
+		return null
+	image.resize(96, 54, Image.INTERPOLATE_BILINEAR)
+	if image.get_format() != Image.FORMAT_RGBA8:
+		image.convert(Image.FORMAT_RGBA8)
+	return image
+
+
+func _difference(a: Image, b: Image) -> float:
+	if a == null or b == null or a.get_size() != b.get_size():
+		return -1.0
+	var total: float = 0.0
+	var brightness: float = 0.0
+	for y in range(a.get_height()):
+		for x in range(a.get_width()):
+			var ca: Color = a.get_pixel(x, y)
+			var cb: Color = b.get_pixel(x, y)
+			total += absf(ca.r - cb.r) + absf(ca.g - cb.g) + absf(ca.b - cb.b)
+			brightness += (ca.r + ca.g + ca.b) / 3.0
+	var count: float = float(a.get_width() * a.get_height())
+	if brightness / count < 0.02:
+		# A black frame only means the readback failed, not that the UI is gone.
+		return -2.0
+	return total / (count * 3.0)
+
+
+## Sends the real game state to the HTML HUD. Only used when the engine's own
+## UI cannot reach the screen.
+func _push_hud() -> void:
+	if not ClassDB.class_exists("JavaScriptBridge"):
+		return
+	var manager: Node = _manager()
+	if manager == null:
+		return
+	var ui: Node = _ui_node()
+	var data: Dictionary = {
+		"state": int(manager.get("state")),
+		"score": int(manager.get("score")),
+		"coins": int(manager.get("coins")),
+		"health": int(manager.get("health")),
+		"max_health": int(manager.get("max_health")),
+		"question": bool(manager.get("question_active")),
+		"question_text": "",
+		"options": [],
+		"time": 0,
+	}
+	if data["question"] and ui != null:
+		var questions: Node = manager.get("_question_manager")
+		if questions != null and questions.has_method("current_question"):
+			var question: Dictionary = questions.call("current_question")
+			data["question_text"] = str(question.get("q", ""))
+			data["options"] = question.get("options", [])
+		data["time"] = ceili(float(ui.get("_question_time_left")))
+	var payload: String = JSON.stringify(data)
+	JavaScriptBridge.eval("window.__khotwaHud && window.__khotwaHud(JSON.parse(%s));" % JSON.stringify(payload), true)
+
+
 func _report(stage: String) -> void:
 	if not OS.has_feature("web"):
 		return
@@ -246,6 +371,7 @@ func _report(stage: String) -> void:
 		"ui_present": ui != null,
 		"ui_children": ui.get_child_count() if ui != null else 0,
 		"ui_healed": _ui_healed,
+		"ui_drawn": _ui_drawn,
 		"game_state": _game_state(scene),
 		"fps": Engine.get_frames_per_second(),
 		"player": _player_info(scene),
