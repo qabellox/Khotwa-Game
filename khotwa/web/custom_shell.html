@@ -584,36 +584,93 @@ const engine = new Engine(GODOT_CONFIG);
 			displayFailureNotice(missingMsg + missing.join('\n'));
 		}
 	} else {
-		setStatusMode('progress');
-		const slowTimer = setTimeout(() => {
-			if (!booted && statusSlow) {
-				statusSlow.hidden = false;
-			}
-		}, 20000);
-		bootWatchdog = setTimeout(recoverFromBootFailure, 90000);
-		engine.startGame({
-			'onProgress': function (current, total) {
-				if (current > 0 && total > 0) {
-					statusProgress.value = current;
-					statusProgress.max = total;
-				} else {
-					statusProgress.removeAttribute('value');
-					statusProgress.removeAttribute('max');
+		// Godot computes the canvas size and lays out the whole UI (HUD, START
+		// button, health bar) once, when the engine starts. Starting while the
+		// phone is still portrait leaves that UI at portrait geometry; after
+		// rotating or entering fullscreen the world renders but the HUD sits
+		// off-screen, so nothing can be tapped. Wait until the page is really
+		// landscape before booting.
+		let bootStarted = false;
+		let bootPoll = null;
+
+		function isLandscape() {
+			return window.innerWidth > window.innerHeight;
+		}
+
+		function stopBootGate() {
+			window.removeEventListener('resize', startEngine);
+			window.removeEventListener('orientationchange', startEngine);
+			document.removeEventListener('fullscreenchange', startEngine);
+			document.removeEventListener('webkitfullscreenchange', startEngine);
+			try {
+				if (screen.orientation && screen.orientation.removeEventListener) {
+					screen.orientation.removeEventListener('change', startEngine);
 				}
-			},
-		}).then(() => {
-			booted = true;
-			clearTimeout(slowTimer);
-			if (bootWatchdog !== null) {
-				clearTimeout(bootWatchdog);
-				bootWatchdog = null;
+			} catch (err) {
+				/* Orientation API is optional. */
 			}
-			clearBootRetry();
-			setStatusMode('hidden');
-		}, (err) => {
-			console.error(err);
-			recoverFromBootFailure();
-		});
+			if (bootPoll !== null) {
+				clearInterval(bootPoll);
+				bootPoll = null;
+			}
+		}
+
+		function startEngine() {
+			if (bootStarted || !isLandscape()) {
+				return;
+			}
+			bootStarted = true;
+			stopBootGate();
+			setStatusMode('progress');
+			const slowTimer = setTimeout(() => {
+				if (!booted && statusSlow) {
+					statusSlow.hidden = false;
+				}
+			}, 20000);
+			bootWatchdog = setTimeout(recoverFromBootFailure, 90000);
+			engine.startGame({
+				'onProgress': function (current, total) {
+					if (current > 0 && total > 0) {
+						statusProgress.value = current;
+						statusProgress.max = total;
+					} else {
+						statusProgress.removeAttribute('value');
+						statusProgress.removeAttribute('max');
+					}
+				},
+			}).then(() => {
+				booted = true;
+				clearTimeout(slowTimer);
+				if (bootWatchdog !== null) {
+					clearTimeout(bootWatchdog);
+					bootWatchdog = null;
+				}
+				clearBootRetry();
+				setStatusMode('hidden');
+				// Nudge the engine once more now that the final landscape size
+				// is known (some Android browsers settle the viewport late).
+				window.dispatchEvent(new Event('resize'));
+			}, (err) => {
+				console.error(err);
+				recoverFromBootFailure();
+			});
+		}
+
+		window.addEventListener('resize', startEngine);
+		window.addEventListener('orientationchange', startEngine);
+		document.addEventListener('fullscreenchange', startEngine);
+		document.addEventListener('webkitfullscreenchange', startEngine);
+		try {
+			if (screen.orientation && screen.orientation.addEventListener) {
+				screen.orientation.addEventListener('change', startEngine);
+			}
+		} catch (err) {
+			/* Orientation API is optional. */
+		}
+		bootPoll = setInterval(startEngine, 300);
+
+		// Nothing else happens while portrait: the rotate overlay is showing.
+		startEngine();
 	}
 }());
 		</script>
