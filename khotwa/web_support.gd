@@ -8,10 +8,15 @@ extends Node
 ##  2. A start fallback: while the menu is up, a tap anywhere starts the run, so
 ##     the game is playable even if the on-screen START button is not visible.
 
-var _pixel_checks: int = 0
 var _pressed: bool = false
 var _press_position: Vector2 = Vector2.ZERO
 var _js_start_callback: Variant = null
+var _js_ping_callback: Variant = null
+var _ui_healed: bool = false
+var _tick: float = 0.0
+var _question_override: bool = false
+
+const DESIGN_SIZE := Vector2i(1920, 1080)
 
 
 func _ready() -> void:
@@ -23,6 +28,16 @@ func _ready() -> void:
 	for delay in [0.75, 2.5, 6.0, 12.0, 20.0]:
 		await get_tree().create_timer(delay).timeout
 		_report("late")
+
+
+func _process(delta: float) -> void:
+	if not OS.has_feature("web"):
+		return
+	_tick += delta
+	if _tick < 0.25:
+		return
+	_tick = 0.0
+	_keep_ui_alive()
 
 
 func _manager() -> Node:
@@ -50,6 +65,12 @@ func _register_js_start() -> void:
 		return
 	_js_start_callback = JavaScriptBridge.create_callback(_on_js_start)
 	JavaScriptBridge.get_interface("window").__khotwaStart = _js_start_callback
+	_js_ping_callback = JavaScriptBridge.create_callback(_on_js_ping)
+	JavaScriptBridge.get_interface("window").__khotwaPing = _js_ping_callback
+
+
+func _on_js_ping(_args: Array) -> void:
+	_report("ping")
 
 
 func _on_js_start(_args: Array) -> void:
@@ -106,6 +127,101 @@ func _on_size_changed() -> void:
 	_report("resize")
 
 
+## The HUD is built and refreshed by ui.gd. On some phones that script's own
+## loop or signal wiring stops early: the world and the game logic keep running,
+## but the score bar, the health bar, the pause button and the game-over /
+## revive question never appear. This does not change gameplay; it only makes
+## sure the UI layer is on screen, wired to the game manager and refreshed.
+func _keep_ui_alive() -> void:
+	var root: Window = get_tree().root
+	if root.content_scale_size != DESIGN_SIZE:
+		root.content_scale_size = DESIGN_SIZE
+		_ui_healed = true
+	if root.content_scale_mode != Window.CONTENT_SCALE_MODE_CANVAS_ITEMS:
+		root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		_ui_healed = true
+	if root.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_KEEP:
+		root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+		_ui_healed = true
+
+	var manager: Node = _manager()
+	var ui: Node = _ui_node()
+	if ui == null:
+		return
+
+	if ui is CanvasLayer:
+		var layer: CanvasLayer = ui as CanvasLayer
+		if not layer.visible:
+			layer.visible = true
+			_ui_healed = true
+		if layer.layer < 100:
+			layer.layer = 100
+			_ui_healed = true
+		if layer.offset != Vector2.ZERO:
+			layer.offset = Vector2.ZERO
+			_ui_healed = true
+		if layer.transform != Transform2D.IDENTITY:
+			layer.transform = Transform2D.IDENTITY
+			_ui_healed = true
+		if layer.follow_viewport_enabled:
+			layer.follow_viewport_enabled = false
+			_ui_healed = true
+
+	# Only when the UI script never finished building are the controls missing
+	# entirely. Rebuild once in that case.
+	if ui.get("_score_panel") == null and ui.get_script() != null:
+		ui.call("_ready")
+		_ui_healed = true
+
+	if manager == null:
+		return
+	if ui.get("game_manager") == null:
+		ui.set("game_manager", manager)
+		_ui_healed = true
+
+	# Re-wire the state signals if the UI stopped before connecting them.
+	_connect_once(manager, "score_changed", "_on_score_changed")
+	_connect_once(manager, "health_changed", "_on_health_changed")
+	_connect_once(manager, "coins_changed", "_on_coins_changed")
+	_connect_once(manager, "question_requested", "_on_question_requested")
+	_connect_once(manager, "question_resolved", "_on_question_resolved")
+
+	if ui.get("_score_panel") == null or ui.get("_question_overlay") == null \
+			or not ui.has_method("_refresh"):
+		return
+
+	# Drive the panels ourselves so they appear even if the UI's own _process
+	# stopped. Skipped while a question is up, exactly like ui.gd does, so it
+	# can never hide the question.
+	if not bool(manager.get("question_active")):
+		ui.call("_refresh")
+		_question_override = false
+		return
+
+	# A question that was already waiting before the wiring was repaired would
+	# otherwise stay invisible. Show it once.
+	if _question_override:
+		return
+	var overlay: Control = ui.get("_question_overlay")
+	if overlay != null and not overlay.visible and ui.has_method("_on_question_requested"):
+		var questions: Node = manager.get("_question_manager")
+		if questions != null and questions.has_method("current_question"):
+			ui.call("_on_question_requested", questions.call("current_question"), int(manager.get("_question_context")))
+			_question_override = true
+			_ui_healed = true
+
+
+func _connect_once(manager: Node, signal_name: String, method_name: String) -> void:
+	var ui: Node = _ui_node()
+	if ui == null or not ui.has_method(method_name):
+		return
+	var callback: Callable = Callable(ui, method_name)
+	if manager.is_connected(signal_name, callback):
+		return
+	manager.connect(signal_name, callback)
+	_ui_healed = true
+
+
 func _report(stage: String) -> void:
 	if not OS.has_feature("web"):
 		return
@@ -129,39 +245,20 @@ func _report(stage: String) -> void:
 		"driver": RenderingServer.get_current_rendering_driver_name(),
 		"ui_present": ui != null,
 		"ui_children": ui.get_child_count() if ui != null else 0,
+		"ui_healed": _ui_healed,
 		"game_state": _game_state(scene),
+		"fps": Engine.get_frames_per_second(),
+		"player": _player_info(scene),
 		"start": _control_info(_find_button(ui, "START")),
 		"pause": _control_info(_find_button(ui, "II")),
+		"score_panel": _control_info(ui.get("_score_panel") if ui != null else null),
+		"health": _control_info(ui.get("_health_fill") if ui != null else null),
+		"game_over": _control_info(ui.get("_game_over_overlay") if ui != null else null),
+		"revive": _control_info(ui.get("_revive_button") if ui != null else null),
 	}
-	if stage == "late" and _pixel_checks < 1:
-		_pixel_checks += 1
-		data["start_pixels"] = _count_start_pixels()
 	var payload: String = JSON.stringify(data)
 	var quoted: String = JSON.stringify(payload)
 	JavaScriptBridge.eval("window.__khotwaProbe && window.__khotwaProbe(JSON.parse(%s));" % quoted, true)
-
-
-## Counts pixels that match the START button green in the frame the engine
-## actually rendered. If the control exists but this is zero, the UI is not
-## reaching the screen.
-func _count_start_pixels() -> int:
-	var image: Image = get_viewport().get_texture().get_image()
-	if image == null or image.is_empty():
-		return -1
-	if image.get_format() != Image.FORMAT_RGBA8:
-		image.convert(Image.FORMAT_RGBA8)
-	var width: int = image.get_width()
-	var height: int = image.get_height()
-	if width <= 0 or height <= 0:
-		return -1
-	var step: int = maxi(1, int(width / 320.0))
-	var count: int = 0
-	for y in range(0, height, step):
-		for x in range(0, width, step):
-			var color: Color = image.get_pixel(x, y)
-			if color.g > 0.55 and color.r < 0.45 and color.b > 0.22 and color.b < 0.65 and (color.g - color.r) > 0.25:
-				count += 1
-	return count
 
 
 func _game_state(scene: Node) -> Variant:
@@ -171,6 +268,20 @@ func _game_state(scene: Node) -> Variant:
 	if manager == null:
 		return null
 	return manager.get("state")
+
+
+func _player_info(scene: Node) -> Variant:
+	if scene == null:
+		return null
+	var player: Node = scene.get_node_or_null("Player")
+	if player == null:
+		return null
+	var pos: Vector2 = player.get("position")
+	return {
+		"y": pos.y,
+		"target": player.get("target_y"),
+		"lane": player.get("_lane_index"),
+	}
 
 
 func _find_button(node: Node, label: String) -> Button:
