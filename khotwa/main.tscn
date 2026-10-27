@@ -1,0 +1,26 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://player.gd" id="1_script_player"]
+[ext_resource type="Script" path="res://game_manager.gd" id="2_script_manager"]
+[ext_resource type="Script" path="res://obstacle_spawner.gd" id="3_script_spawner"]
+[ext_resource type="Script" path="res://pickup_spawner.gd" id="4_script_pickup"]
+[ext_resource type="Script" path="res://track.gd" id="5_script_track"]
+
+[node name="Main" type="Node2D"]
+
+[node name="Track" type="Node2D" parent="."]
+script = ExtResource("5_script_track")
+
+[node name="Player" type="CharacterBody2D" parent="."]
+script = ExtResource("1_script_player")
+
+[node name="Sprite" type="AnimatedSprite2D" parent="Player"]
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("2_script_manager")
+
+[node name="ObstacleSpawner" type="Node2D" parent="."]
+script = ExtResource("3_script_spawner")
+
+[node name="PickupSpawner" type="Node2D" parent="."]
+script = ExtResource("4_script_pickup")
