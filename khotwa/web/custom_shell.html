@@ -1369,6 +1369,24 @@ const engine = new Engine(GODOT_CONFIG);
 			open('The game engine did not send a layout report');
 		}
 	}, 1000);
+
+	// Desktop start: Tab or Enter starts the run, and Tab never moves focus
+	// off the canvas.
+	window.addEventListener('keydown', (event) => {
+		if (event.key !== 'Tab' && event.key !== 'Enter') {
+			return;
+		}
+		if (event.key === 'Tab') {
+			event.preventDefault();
+		}
+		if (typeof window.__khotwaStart === 'function') {
+			try {
+				window.__khotwaStart();
+			} catch (err) {
+				/* Starting is best effort. */
+			}
+		}
+	}, true);
 }());
 		</script>
 	</body>

@@ -62,10 +62,19 @@ func _input(event: InputEvent) -> void:
 	if not _in_menu():
 		_pressed = false
 		return
+	if event is InputEventKey:
+		if event.pressed and not event.echo and _is_start_key(event):
+			_start_game()
+		return
 	if event is InputEventScreenTouch:
 		_handle_tap(event.pressed, event.position)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_tap(event.pressed, event.position)
+
+
+func _is_start_key(event: InputEventKey) -> bool:
+	return event.keycode == KEY_TAB or event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER \
+		or event.keycode == KEY_SPACE
 
 
 func _handle_tap(pressed: bool, position: Vector2) -> void:
