@@ -967,6 +967,7 @@ const engine = new Engine(GODOT_CONFIG);
 
 	let reason = '';
 	let isOpen = false;
+	let openedAt = 0;
 
 	function pad(n) {
 		return (n < 10 ? '0' : '') + n;
@@ -1119,6 +1120,10 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 		lines.push('errors captured: ' + (state.errors || 0));
 		lines.push('start fallback button: ' + (state.startBroken ? 'was shown' : 'not needed'));
+		const stillLoading = !(state.boot && state.boot.ended) && !(state.boot && state.boot.failed);
+		lines.push('status: ' + (stillLoading
+			? 'STILL LOADING - wait for the game to appear, then copy this report'
+			: 'game loaded'));
 		lines.push('');
 		lines.push('--- device ---');
 		lines.push('ua: ' + navigator.userAgent);
@@ -1165,7 +1170,9 @@ const engine = new Engine(GODOT_CONFIG);
 
 	function refresh() {
 		if (isOpen) {
+			const top = body.scrollTop;
 			body.textContent = buildReport();
+			body.scrollTop = top;
 		}
 	}
 
@@ -1174,6 +1181,7 @@ const engine = new Engine(GODOT_CONFIG);
 			reason = nextReason;
 		}
 		isOpen = true;
+		openedAt = Date.now();
 		document.body.classList.add('diag-open');
 		body.textContent = buildReport();
 	}
@@ -1350,6 +1358,17 @@ const engine = new Engine(GODOT_CONFIG);
 	if (/[?&]diag=1/.test(location.search) || location.hash === '#diag') {
 		open('opened manually with ?diag=1');
 	}
+
+	// Keep the report current while it is on screen (boot progress, new errors).
+	setInterval(() => {
+		if (isOpen && Date.now() - openedAt < 180000) {
+			refresh();
+		}
+		if (!isOpen && !state.probe && state.boot && state.boot.ended &&
+			performance.now() - state.boot.ended > 12000) {
+			open('The game engine did not send a layout report');
+		}
+	}, 1000);
 }());
 		</script>
 	</body>
