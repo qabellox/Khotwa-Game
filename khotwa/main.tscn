@@ -1,26 +1,34 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://player.gd" id="1_script_player"]
-[ext_resource type="Script" path="res://game_manager.gd" id="2_script_manager"]
-[ext_resource type="Script" path="res://obstacle_spawner.gd" id="3_script_spawner"]
-[ext_resource type="Script" path="res://pickup_spawner.gd" id="4_script_pickup"]
-[ext_resource type="Script" path="res://track.gd" id="5_script_track"]
+[ext_resource type="Script" uid="uid://di1c84o60fvfp" path="res://track.gd" id="1"]
+[ext_resource type="Script" uid="uid://dua2kgd7f3wn7" path="res://player.gd" id="2"]
+[ext_resource type="Script" uid="uid://fpri4jnjfcv2" path="res://game_manager.gd" id="3"]
+[ext_resource type="Script" uid="uid://1pnra6tcoyki" path="res://question_manager.gd" id="4"]
+[ext_resource type="Script" uid="uid://dg7yj8pl4f4ex" path="res://item_spawner.gd" id="5"]
+[ext_resource type="Script" uid="uid://c2ej1meokhpk6" path="res://speed_lines.gd" id="6"]
+[ext_resource type="Script" uid="uid://bjpyte1rbnmkm" path="res://ui.gd" id="7"]
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" unique_id=175637907]
 
-[node name="Track" type="Node2D" parent="."]
-script = ExtResource("5_script_track")
+[node name="Track" type="Node2D" parent="." unique_id=101332039]
+script = ExtResource("1")
 
-[node name="Player" type="CharacterBody2D" parent="."]
-script = ExtResource("1_script_player")
+[node name="Player" type="CharacterBody2D" parent="." unique_id=1371119918]
+script = ExtResource("2")
 
-[node name="Sprite" type="AnimatedSprite2D" parent="Player"]
+[node name="Sprite" type="Sprite2D" parent="Player" unique_id=856676051]
 
-[node name="GameManager" type="Node" parent="."]
-script = ExtResource("2_script_manager")
+[node name="GameManager" type="Node" parent="." unique_id=1949446528]
+script = ExtResource("3")
 
-[node name="ObstacleSpawner" type="Node2D" parent="."]
-script = ExtResource("3_script_spawner")
+[node name="QuestionManager" type="Node" parent="." unique_id=1549330638]
+script = ExtResource("4")
 
-[node name="PickupSpawner" type="Node2D" parent="."]
-script = ExtResource("4_script_pickup")
+[node name="ItemSpawner" type="Node2D" parent="." unique_id=427521191]
+script = ExtResource("5")
+
+[node name="SpeedLines" type="Node2D" parent="." unique_id=438211789]
+script = ExtResource("6")
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=289178357]
+script = ExtResource("7")

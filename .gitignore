@@ -2,3 +2,5 @@
 .vscode/
 *.tmp
 *.log
+dist/
+khotwa/build/

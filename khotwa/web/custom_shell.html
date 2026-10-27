@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, viewport-fit=cover">
+		<meta name="theme-color" content="#000000">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+		<title>$GODOT_PROJECT_NAME</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+html, body {
+	width: 100%;
+	height: 100%;
+	background-color: #000;
+	overscroll-behavior: none;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+	-webkit-tap-highlight-color: transparent;
+	position: fixed;
+	inset: 0;
+}
+
+#canvas {
+	display: block;
+	background-color: #000;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: $GODOT_SPLASH_COLOR;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+	accent-color: #35c46a;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+
+/* ---------- Mobile presentation (outside the game canvas) ---------- */
+
+#rotate-hint {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 30;
+	background: radial-gradient(circle at 50% 35%, #16222c 0%, #070b0f 70%);
+	color: #fff;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+	align-items: center;
+	justify-content: center;
+	padding: 28px;
+	text-align: center;
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+	#rotate-hint { display: flex; }
+	body.rotate-dismissed #rotate-hint { display: none; }
+}
+
+.rotate-card { max-width: 340px; }
+
+.rotate-icon {
+	width: 84px;
+	height: 84px;
+	margin: 0 auto 18px auto;
+	display: block;
+	animation: rotate-tilt 2.6s ease-in-out infinite;
+	transform-origin: 50% 50%;
+}
+
+@keyframes rotate-tilt {
+	0%, 45% { transform: rotate(0deg); }
+	60%, 100% { transform: rotate(-90deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.rotate-icon { animation: none; transform: rotate(-90deg); }
+}
+
+.rotate-title {
+	font-size: 22px;
+	font-weight: 700;
+	letter-spacing: 0.2px;
+	margin-bottom: 6px;
+}
+
+.rotate-sub {
+	font-size: 18px;
+	font-weight: 600;
+	opacity: 0.9;
+	margin-bottom: 18px;
+	direction: rtl;
+}
+
+.rotate-note {
+	font-size: 13px;
+	opacity: 0.65;
+	margin-bottom: 22px;
+	line-height: 1.45;
+}
+
+.rotate-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+.rotate-actions button {
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 12px 22px;
+	font-size: 15px;
+	font-weight: 600;
+	font-family: inherit;
+	cursor: pointer;
+	background: #35c46a;
+	color: #06210f;
+}
+
+.rotate-actions button.secondary {
+	background: rgba(255, 255, 255, 0.12);
+	color: #fff;
+}
+
+#compat-hint {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	background: #070b0f;
+	color: #fff;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+	align-items: center;
+	justify-content: center;
+	padding: 28px;
+	text-align: center;
+}
+
+body.no-webgl2 #compat-hint { display: flex; }
+
+.compat-card { max-width: 380px; }
+.compat-title { font-size: 21px; font-weight: 700; margin-bottom: 10px; }
+.compat-text { font-size: 15px; line-height: 1.55; opacity: 0.82; }
+.compat-text + .compat-text { margin-top: 10px; direction: rtl; }
+
+#inapp-hint {
+	display: none;
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 25;
+	background: rgba(10, 14, 18, 0.94);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+	color: #fff;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+	font-size: 13px;
+	line-height: 1.4;
+	padding: 10px 44px 10px 14px;
+	text-align: center;
+}
+
+#inapp-hint.show { display: block; }
+
+#inapp-hint button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 40px;
+	height: 100%;
+	background: transparent;
+	border: 0;
+	color: #fff;
+	font-size: 20px;
+	cursor: pointer;
+}
+		</style>
+		$GODOT_HEAD_INCLUDE
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+		</div>
+
+		<div id="rotate-hint" role="dialog" aria-label="Rotate your device">
+			<div class="rotate-card">
+				<svg class="rotate-icon" viewBox="0 0 24 24" fill="none" stroke="#35c46a" stroke-width="1.6"
+					stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<rect x="7" y="2.5" width="10" height="19" rx="2"></rect>
+					<line x1="10.5" y1="18.6" x2="13.5" y2="18.6"></line>
+				</svg>
+				<div class="rotate-title">Rotate your device</div>
+				<div class="rotate-sub" lang="ar">أدر جهازك للعب</div>
+				<div class="rotate-note">Khotwa is a landscape game. Turn your phone sideways for the full experience.</div>
+				<div class="rotate-actions">
+					<button id="rotate-play" type="button">Play in fullscreen</button>
+					<button id="rotate-skip" class="secondary" type="button">Play anyway</button>
+				</div>
+			</div>
+		</div>
+
+		<div id="compat-hint" role="alert">
+			<div class="compat-card">
+				<div class="compat-title">This browser can't run the game</div>
+				<div class="compat-text">
+					Khotwa needs WebGL 2. Please update to a recent version of Chrome, Safari, Firefox or Edge,
+					and open this link directly in the browser (not inside the Instagram, Facebook or TikTok in-app browser).
+				</div>
+				<div class="compat-text" lang="ar">
+					تحتاج اللعبة إلى WebGL 2. يرجى تحديث المتصفح أو فتح الرابط مباشرة في Safari أو Chrome.
+				</div>
+			</div>
+		</div>
+
+		<div id="inapp-hint">
+			For the best experience, open this link in Safari or Chrome.
+			<button id="inapp-close" type="button" aria-label="Dismiss">&times;</button>
+		</div>
+
+		<script src="$GODOT_URL"></script>
+		<script>
+const GODOT_CONFIG = $GODOT_CONFIG;
+const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+		<script>
+/* Mobile presentation helpers. These only affect the page around the game;
+   the Godot project, scene and gameplay are untouched. */
+(function () {
+	let webgl2 = false;
+	try {
+		const probe = document.createElement('canvas');
+		webgl2 = !!(window.WebGL2RenderingContext && probe.getContext('webgl2'));
+	} catch (err) {
+		webgl2 = false;
+	}
+	if (!webgl2) {
+		document.body.classList.add('no-webgl2');
+	}
+
+	const inAppPattern = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|TikTok|Snapchat|Pinterest/i;
+	if (inAppPattern.test(navigator.userAgent || '')) {
+		const hint = document.getElementById('inapp-hint');
+		if (hint) {
+			hint.classList.add('show');
+			const close = document.getElementById('inapp-close');
+			if (close) {
+				close.addEventListener('click', () => hint.classList.remove('show'));
+			}
+			setTimeout(() => hint.classList.remove('show'), 9000);
+		}
+	}
+
+	function requestFullscreen() {
+		const el = document.documentElement;
+		const request = el.requestFullscreen || el.webkitRequestFullscreen;
+		if (!request) {
+			return Promise.reject(new Error('fullscreen unavailable'));
+		}
+		try {
+			return Promise.resolve(request.call(el));
+		} catch (err) {
+			return Promise.reject(err);
+		}
+	}
+
+	function lockLandscape() {
+		try {
+			if (screen.orientation && typeof screen.orientation.lock === 'function') {
+				return screen.orientation.lock('landscape').catch(() => {});
+			}
+		} catch (err) {
+			/* Orientation lock is best-effort (unsupported on iOS). */
+		}
+		return Promise.resolve();
+	}
+
+	const playButton = document.getElementById('rotate-play');
+	if (playButton) {
+		playButton.addEventListener('click', () => {
+			document.body.classList.add('rotate-dismissed');
+			requestFullscreen().then(lockLandscape).catch(() => {});
+		});
+	}
+
+	const skipButton = document.getElementById('rotate-skip');
+	if (skipButton) {
+		skipButton.addEventListener('click', () => {
+			document.body.classList.add('rotate-dismissed');
+		});
+	}
+
+	// Stop iOS double-tap zoom and long-press callouts on the canvas.
+	const canvas = document.getElementById('canvas');
+	if (canvas) {
+		canvas.addEventListener('gesturestart', (event) => event.preventDefault());
+		canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+	}
+}());
+		</script>
+	</body>
+</html>
