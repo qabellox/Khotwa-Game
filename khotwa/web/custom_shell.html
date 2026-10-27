@@ -18,6 +18,7 @@ html, body, #canvas {
 html, body {
 	width: 100%;
 	height: 100%;
+	height: 100dvh;
 	background-color: #000;
 	overscroll-behavior: none;
 }
@@ -56,7 +57,7 @@ body {
 }
 
 #status {
-	background-color: $GODOT_SPLASH_COLOR;
+	background-color: #000;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
@@ -109,6 +110,20 @@ body {
 	z-index: 1;
 }
 
+#status-notice .status-reload {
+	margin-top: 14px;
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 10px 22px;
+	font-size: 15px;
+	font-weight: 600;
+	font-family: inherit;
+	cursor: pointer;
+	background: #35c46a;
+	color: #06210f;
+}
+
 /* ---------- Mobile presentation (outside the game canvas) ---------- */
 
 #rotate-hint {
@@ -122,12 +137,15 @@ body {
 	align-items: center;
 	justify-content: center;
 	padding: 28px;
+	padding-top: max(28px, env(safe-area-inset-top));
+	padding-bottom: max(28px, env(safe-area-inset-bottom));
+	padding-left: max(28px, env(safe-area-inset-left));
+	padding-right: max(28px, env(safe-area-inset-right));
 	text-align: center;
 }
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) {
 	#rotate-hint { display: flex; }
-	body.rotate-dismissed #rotate-hint { display: none; }
 }
 
 .rotate-card { max-width: 340px; }
@@ -185,11 +203,6 @@ body {
 	cursor: pointer;
 	background: #35c46a;
 	color: #06210f;
-}
-
-.rotate-actions button.secondary {
-	background: rgba(255, 255, 255, 0.12);
-	color: #fff;
 }
 
 #compat-hint {
@@ -271,10 +284,9 @@ body.no-webgl2 #compat-hint { display: flex; }
 				</svg>
 				<div class="rotate-title">Rotate your device</div>
 				<div class="rotate-sub" lang="ar">أدر جهازك للعب</div>
-				<div class="rotate-note">Khotwa is a landscape game. Turn your phone sideways for the full experience.</div>
+				<div class="rotate-note">Khotwa is played in landscape. Turn your phone sideways (or widen this window) for the full experience.</div>
 				<div class="rotate-actions">
 					<button id="rotate-play" type="button">Play in fullscreen</button>
-					<button id="rotate-skip" class="secondary" type="button">Play anyway</button>
 				</div>
 			</div>
 		</div>
@@ -335,6 +347,12 @@ const engine = new Engine(GODOT_CONFIG);
 			statusNotice.appendChild(document.createTextNode(line));
 			statusNotice.appendChild(document.createElement('br'));
 		});
+		const reload = document.createElement('button');
+		reload.type = 'button';
+		reload.className = 'status-reload';
+		reload.textContent = 'Reload';
+		reload.addEventListener('click', () => window.location.reload());
+		statusNotice.appendChild(reload);
 	}
 
 	function displayFailureNotice(err) {
@@ -349,6 +367,69 @@ const engine = new Engine(GODOT_CONFIG);
 		setStatusMode('notice');
 		initializing = false;
 	}
+
+	const BOOT_RETRY_KEY = 'khotwa_boot_retry';
+
+	// Some iOS WebKit builds occasionally abort the WebAssembly download/compile.
+	// One automatic reload per page load is enough to recover from a transient failure
+	// without ever looping.
+	function shouldRetryBoot() {
+		try {
+			if (sessionStorage.getItem(BOOT_RETRY_KEY) === '1') {
+				return false;
+			}
+			sessionStorage.setItem(BOOT_RETRY_KEY, '1');
+			return true;
+		} catch (err) {
+			return false;
+		}
+	}
+
+	function clearBootRetry() {
+		try {
+			sessionStorage.removeItem(BOOT_RETRY_KEY);
+		} catch (err) {
+			/* Storage can be unavailable in private modes. */
+		}
+	}
+
+	let booted = false;
+	let bootWatchdog = null;
+
+	const BOOT_FAILURE_NOTICE =
+		'The game could not be loaded.\nCheck your connection and try again.\n' +
+		'تعذر تحميل اللعبة.\nتحقق من اتصالك وحاول مرة أخرى.';
+
+	// Godot's loader does not reject startGame when the wasm fetch or compile fails,
+	// so recover from the unhandled rejection it produces instead of hanging on black.
+	function recoverFromBootFailure() {
+		if (booted) {
+			return;
+		}
+		if (bootWatchdog !== null) {
+			clearTimeout(bootWatchdog);
+			bootWatchdog = null;
+		}
+		if (shouldRetryBoot()) {
+			window.location.reload();
+			return;
+		}
+		clearBootRetry();
+		displayFailureNotice(BOOT_FAILURE_NOTICE);
+	}
+
+	window.addEventListener('unhandledrejection', (event) => {
+		if (booted) {
+			return;
+		}
+		const reason = event.reason;
+		const message = reason && (reason.message || reason.name || String(reason));
+		if (!/fetch|wasm|webassembly|compile|abort|network|load/i.test(String(message))) {
+			return;
+		}
+		event.preventDefault();
+		recoverFromBootFailure();
+	});
 
 	const missing = Engine.getMissingFeatures({
 		threads: GODOT_THREADS_ENABLED,
@@ -387,6 +468,7 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
+		bootWatchdog = setTimeout(recoverFromBootFailure, 90000);
 		engine.startGame({
 			'onProgress': function (current, total) {
 				if (current > 0 && total > 0) {
@@ -398,8 +480,17 @@ const engine = new Engine(GODOT_CONFIG);
 				}
 			},
 		}).then(() => {
+			booted = true;
+			if (bootWatchdog !== null) {
+				clearTimeout(bootWatchdog);
+				bootWatchdog = null;
+			}
+			clearBootRetry();
 			setStatusMode('hidden');
-		}, displayFailureNotice);
+		}, (err) => {
+			console.error(err);
+			recoverFromBootFailure();
+		});
 	}
 }());
 		</script>
@@ -457,17 +548,15 @@ const engine = new Engine(GODOT_CONFIG);
 
 	const playButton = document.getElementById('rotate-play');
 	if (playButton) {
-		playButton.addEventListener('click', () => {
-			document.body.classList.add('rotate-dismissed');
-			requestFullscreen().then(lockLandscape).catch(() => {});
-		});
-	}
-
-	const skipButton = document.getElementById('rotate-skip');
-	if (skipButton) {
-		skipButton.addEventListener('click', () => {
-			document.body.classList.add('rotate-dismissed');
-		});
+		const canFullscreen = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+		if (!canFullscreen) {
+			// iPhone Safari has no element fullscreen; rotating the phone is the only path.
+			playButton.remove();
+		} else {
+			playButton.addEventListener('click', () => {
+				requestFullscreen().then(lockLandscape).catch(() => {});
+			});
+		}
 	}
 
 	// Stop iOS double-tap zoom and long-press callouts on the canvas.
