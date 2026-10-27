@@ -395,6 +395,7 @@ const engine = new Engine(GODOT_CONFIG);
 
 	let booted = false;
 	let bootWatchdog = null;
+	let bootRecoveryStarted = false;
 
 	const BOOT_FAILURE_NOTICE =
 		'The game could not be loaded.\nCheck your connection and try again.\n' +
@@ -403,9 +404,10 @@ const engine = new Engine(GODOT_CONFIG);
 	// Godot's loader does not reject startGame when the wasm fetch or compile fails,
 	// so recover from the unhandled rejection it produces instead of hanging on black.
 	function recoverFromBootFailure() {
-		if (booted) {
+		if (booted || bootRecoveryStarted) {
 			return;
 		}
+		bootRecoveryStarted = true;
 		if (bootWatchdog !== null) {
 			clearTimeout(bootWatchdog);
 			bootWatchdog = null;
