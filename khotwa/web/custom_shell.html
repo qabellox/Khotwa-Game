@@ -39,6 +39,15 @@ body {
 #canvas {
 	display: block;
 	background-color: #000;
+	/* Godot sizes the drawing buffer from window.innerWidth/Height. Some Android
+	   browsers/WebViews report a layout viewport larger than the visible screen,
+	   which used to push the canvas (and the centred START button) off-screen.
+	   Pinning the CSS box to the page viewport keeps the whole game visible and
+	   lets pointer coordinates map correctly. */
+	width: 100% !important;
+	height: 100% !important;
+	max-width: 100%;
+	max-height: 100%;
 }
 
 #canvas:focus {
@@ -94,6 +103,37 @@ body {
 	width: 50%;
 	margin: 0 auto;
 	accent-color: #35c46a;
+}
+
+#status-slow {
+	position: absolute;
+	bottom: 17%;
+	left: 0;
+	right: 0;
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	justify-content: center;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	font-size: 14px;
+	color: rgba(255, 255, 255, 0.72);
+}
+
+#status-slow[hidden] {
+	display: none;
+}
+
+#status-slow button {
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 8px 18px;
+	font-size: 13px;
+	font-weight: 600;
+	font-family: inherit;
+	cursor: pointer;
+	background: #35c46a;
+	color: #06210f;
 }
 
 #status-notice {
@@ -221,6 +261,36 @@ body {
 
 body.no-webgl2 #compat-hint { display: flex; }
 
+#fatal-hint {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	background: #070b0f;
+	color: #fff;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+	align-items: center;
+	justify-content: center;
+	padding: 28px;
+	text-align: center;
+}
+
+body.graphics-lost #fatal-hint { display: flex; }
+
+.compat-button {
+	margin-top: 18px;
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 12px 24px;
+	font-size: 15px;
+	font-weight: 600;
+	font-family: inherit;
+	cursor: pointer;
+	background: #35c46a;
+	color: #06210f;
+}
+
 .compat-card { max-width: 380px; }
 .compat-title { font-size: 21px; font-weight: 700; margin-bottom: 10px; }
 .compat-text { font-size: 15px; line-height: 1.55; opacity: 0.82; }
@@ -258,6 +328,25 @@ body.no-webgl2 #compat-hint { display: flex; }
 	cursor: pointer;
 }
 		</style>
+		<script>
+/* Cap the render resolution on phones. A high-DPR Android device can ask Godot
+   for a drawing buffer larger than the GPU's maximum renderbuffer/texture size,
+   which shows up as a black or frozen canvas. 2x CSS pixels stays crisp and
+   inside mobile GPU limits. */
+(function () {
+	try {
+		var nativeDpr = window.devicePixelRatio || 1;
+		Object.defineProperty(window, 'devicePixelRatio', {
+			configurable: true,
+			get: function () {
+				return Math.min(nativeDpr, 2);
+			},
+		});
+	} catch (err) {
+		/* Some browsers make devicePixelRatio non-configurable; keep the default. */
+	}
+}());
+		</script>
 		$GODOT_HEAD_INCLUDE
 	</head>
 	<body>
@@ -273,6 +362,10 @@ body.no-webgl2 #compat-hint { display: flex; }
 			<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
+			<div id="status-slow" hidden>
+				<span>Still loading?</span>
+				<button id="status-slow-reload" type="button">Reload</button>
+			</div>
 		</div>
 
 		<div id="rotate-hint" role="dialog" aria-label="Rotate your device">
@@ -304,6 +397,19 @@ body.no-webgl2 #compat-hint { display: flex; }
 			</div>
 		</div>
 
+		<div id="fatal-hint" role="alert">
+			<div class="compat-card">
+				<div class="compat-title">The game stopped</div>
+				<div class="compat-text">
+					The graphics were interrupted by the phone or the browser. Reload to continue.
+				</div>
+				<div class="compat-text" lang="ar">
+					توقفت اللعبة بسبب مقاطعة الرسومات. أعد تحميل الصفحة للمتابعة.
+				</div>
+				<button id="fatal-reload" class="compat-button" type="button">Reload</button>
+			</div>
+		</div>
+
 		<div id="inapp-hint">
 			For the best experience, open this link in Safari or Chrome.
 			<button id="inapp-close" type="button" aria-label="Dismiss">&times;</button>
@@ -319,6 +425,12 @@ const engine = new Engine(GODOT_CONFIG);
 	const statusOverlay = document.getElementById('status');
 	const statusProgress = document.getElementById('status-progress');
 	const statusNotice = document.getElementById('status-notice');
+	const statusSlow = document.getElementById('status-slow');
+	const statusSlowReload = document.getElementById('status-slow-reload');
+
+	if (statusSlowReload) {
+		statusSlowReload.addEventListener('click', () => window.location.reload());
+	}
 
 	let initializing = true;
 	let statusMode = '';
@@ -357,6 +469,9 @@ const engine = new Engine(GODOT_CONFIG);
 
 	function displayFailureNotice(err) {
 		console.error(err);
+		if (statusSlow) {
+			statusSlow.hidden = true;
+		}
 		if (err instanceof Error) {
 			setStatusNotice(err.message);
 		} else if (typeof err === 'string') {
@@ -470,6 +585,11 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
+		const slowTimer = setTimeout(() => {
+			if (!booted && statusSlow) {
+				statusSlow.hidden = false;
+			}
+		}, 20000);
 		bootWatchdog = setTimeout(recoverFromBootFailure, 90000);
 		engine.startGame({
 			'onProgress': function (current, total) {
@@ -483,6 +603,7 @@ const engine = new Engine(GODOT_CONFIG);
 			},
 		}).then(() => {
 			booted = true;
+			clearTimeout(slowTimer);
 			if (bootWatchdog !== null) {
 				clearTimeout(bootWatchdog);
 				bootWatchdog = null;
@@ -566,6 +687,18 @@ const engine = new Engine(GODOT_CONFIG);
 	if (canvas) {
 		canvas.addEventListener('gesturestart', (event) => event.preventDefault());
 		canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+		canvas.addEventListener('webglcontextlost', (event) => {
+			event.preventDefault();
+			document.body.classList.add('graphics-lost');
+		});
+		canvas.addEventListener('webglcontextcreationerror', () => {
+			document.body.classList.add('no-webgl2');
+		});
+	}
+
+	const fatalReload = document.getElementById('fatal-reload');
+	if (fatalReload) {
+		fatalReload.addEventListener('click', () => window.location.reload());
 	}
 }());
 		</script>
