@@ -234,11 +234,11 @@ func _unhandled_input(event: InputEvent) -> void :
 		_lane_index = best
 		target_y = lane_positions[_lane_index]
 
-func _apply_lane_slide(_delta: float) -> void :
+func _apply_lane_slide(delta: float) -> void :
 
 
 
-	position.y = move_toward(position.y, target_y, move_speed)
+	position.y = move_toward(position.y, target_y, move_speed * 60.0 * delta)
 
 
 

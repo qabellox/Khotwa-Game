@@ -491,10 +491,15 @@ body.fallback-start #fallback-start {
 (function () {
 	try {
 		var nativeDpr = window.devicePixelRatio || 1;
+		// Phones are fill-rate bound: 2x CSS pixels is more pixels than a 1080p
+		// desktop, which drops low-end devices to a slideshow and makes taps feel
+		// seconds late. 1.5x is still sharp on a phone and roughly doubles FPS.
+		var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+		var cap = touch ? 1.5 : 2;
 		Object.defineProperty(window, 'devicePixelRatio', {
 			configurable: true,
 			get: function () {
-				return Math.min(nativeDpr, 2);
+				return Math.min(nativeDpr, cap);
 			},
 		});
 	} catch (err) {
@@ -956,7 +961,7 @@ const engine = new Engine(GODOT_CONFIG);
    It opens by itself when the game reports a broken UI, with ?diag=1, or via
    three quick taps in the top-left corner. */
 (function () {
-	const SHELL_VERSION = '2026-10-27.e';
+	const SHELL_VERSION = '2026-10-27.f';
 	const state = window.__khotwaState || (window.__khotwaState = { startedAt: Date.now(), errors: 0, boot: null, probe: null });
 	const panel = document.getElementById('diag');
 	const body = document.getElementById('diag-body');
@@ -1080,11 +1085,11 @@ const engine = new Engine(GODOT_CONFIG);
 			' | render: ' + (p.method || '?') + ' / ' + (p.driver || '?'));
 		lines.push('gpu (godot): ' + (p.adapter || '?') + ' / ' + (p.vendor || '?'));
 		lines.push('ui: ' + (p.ui_present ? 'present, ' + p.ui_children + ' controls' : 'MISSING') +
-			' | state: ' + (p.game_state === null || p.game_state === undefined ? '?' : p.game_state));
+			' | state: ' + (p.game_state === null || p.game_state === undefined ? '?' : p.game_state) +
+			' | fps: ' + (p.fps === undefined ? 'n/a' : p.fps));
 		const rect = (r) => r ? [r[0], r[1], r[2], r[3]].join(',') : 'n/a';
 		if (p.start) {
-			lines.push('start button: ' + rect(p.start.rect) + ' visible ' + p.start.visible +
-				' | drawn pixels: ' + (p.start_pixels === undefined ? 'n/a' : p.start_pixels));
+			lines.push('start button: ' + rect(p.start.rect) + ' visible ' + p.start.visible);
 		}
 		if (p.health) {
 			lines.push('health bar: ' + rect(p.health.rect) + ' visible ' + p.health.visible);
@@ -1224,9 +1229,6 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 		if (inMenu && p.start) {
 			if (!p.start.visible) {
-				brokenStart = true;
-			}
-			if (typeof p.start_pixels === 'number' && p.start_pixels === 0) {
 				brokenStart = true;
 			}
 			if (p.start.rect) {
