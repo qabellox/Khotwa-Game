@@ -42,8 +42,10 @@
 
   // ---------- audio (Web Audio, no MP3 dependency) ----------
   const AC = new (window.AudioContext || window.webkitAudioContext)();
+  let audioOn = true;
   function ensureAudio() { if (AC.state === 'suspended') AC.resume(); }
   function tone(freq, type, duration, vol = 0.12) {
+    if (!audioOn) return;
     ensureAudio();
     const t = AC.currentTime;
     const o = AC.createOscillator(); const g = AC.createGain();
@@ -53,14 +55,17 @@
     o.start(t); o.stop(t + duration);
   }
   function sfx(kind) {
+    if (!audioOn) return;
     if (kind === 'coin')   { tone(880, 'square', 0.12); }
     else if (kind === 'heal') { tone(1200, 'square', 0.16); }
     else if (kind === 'pain') { tone(160, 'sawtooth', 0.35, 0.25); }
     else if (kind === 'death') { tone(110, 'sawtooth', 0.6, 0.3); setTimeout(() => tone(80, 'sawtooth', 0.6, 0.25), 300); }
+    else if (kind === 'click') { tone(900, 'square', 0.06); }
   }
+  let bgmOn = true;
   let bgmOsc = null, bgmGain = null;
   function bgmStart() {
-    if (bgmOsc) return;
+    if (!bgmOn || bgmOsc) return;
     ensureAudio();
     const t = AC.currentTime;
     bgmGain = AC.createGain(); bgmGain.gain.value = 0.05; bgmGain.connect(AC.destination);
@@ -105,19 +110,30 @@
   let question = null;
   let questionTimer = 0;
 
+  // persistent high score
+  let bestScore = 0;
+  function loadBest() { try { bestScore = parseInt(localStorage.getItem('khotwa_best') || '0', 10) || 0; } catch (e) { bestScore = 0; } }
+  function saveBest() { try { localStorage.setItem('khotwa_best', String(bestScore)); } catch (e) {} }
+
   const els = {
     score: document.getElementById('score'), coins: document.getElementById('coins'),
     speed: document.getElementById('speed'), fill: document.getElementById('hud-fill'),
-    final: document.getElementById('finalScore'),
+    final: document.getElementById('finalScore'), best: document.getElementById('bestScore'),
     qText: document.getElementById('qText'), qTime: document.getElementById('qTime'),
     qOpts: document.getElementById('qOpts'), qResult: document.getElementById('qResult'),
   };
-  const screens = { menu: document.getElementById('menu'), pause: document.getElementById('pause'),
+  const screens = { start: document.getElementById('start'), pause: document.getElementById('pause'),
     gameover: document.getElementById('gameover'), question: document.getElementById('question') };
+  const panels = { settings: document.getElementById('panelSettings'), howto: document.getElementById('panelHowTo') };
   function show(name) {
     Object.values(screens).forEach(s => s.classList.remove('visible'));
     if (name) screens[name].classList.add('visible');
   }
+  function showPanel(name) {
+    Object.values(panels).forEach(p => p.classList.remove('visible'));
+    if (name) panels[name].classList.add('visible');
+  }
+  function hideAll() { show(null); Object.values(panels).forEach(p => p.classList.remove('visible')); }
   function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function rnd() { return Math.random(); }
 
@@ -143,12 +159,14 @@
   }
   function gameOver() {
     dead = true; state = 'GAMEOVER'; bgmStop(); sfx('death');
+    if (score > bestScore) { bestScore = score; saveBest(); if (els.best) els.best.textContent = fmt(bestScore); }
     els.final.textContent = fmt(score);
     show('gameover');
   }
-  function startRun() { resetRun(); state = 'RUNNING'; dead = false; bgmStart(); show(null); }
+  function startRun() { resetRun(); state = 'RUNNING'; dead = false; bgmStart(); hideAll(); }
   function pauseGame() { if (state === 'RUNNING') { state = 'PAUSED'; bgmStop(); show('pause'); } }
   function resumeGame() { if (state === 'PAUSED') { state = 'RUNNING'; bgmStart(); show(null); } }
+  function backToMenu() { state = 'MENU'; bgmStop(); showPanel(null); show('start'); }
   function revive() {
     health = MAX_HEALTH; dead = false; state = 'RUNNING'; addScore(100); updateHud();
     bgmStart(); show(null); question = null; questionTimer = 0;
@@ -177,7 +195,7 @@
   function answer(i) {
     if (!question) return;
     const correct = i === question.correct;
-    els.qResult.textContent = correct ? 'إجابة صحيحة — عدت للعب ✅' : 'إجابة خاطئة —/game over';
+    els.qResult.textContent = correct ? 'إجابة صحيحة — عدت للعب ✅' : 'إجابة خاطئة — اللعبة انتهت';
     if (correct) { sfx('coin'); setTimeout(revive, 900); }
     else { sfx('pain'); setTimeout(() => { gameOver(); show('gameover'); }, 900); }
     question = null;
@@ -216,7 +234,7 @@
 
   // ---------- input ----------
   function onKey(e, pressed) {
-    if (state === 'MENU' && pressed && (e.key === 'Enter' || e.key === ' ')) { startRun(); return; }
+    if (state === 'MENU' && pressed && (e.key === 'Enter' || e.key === ' ')) { sfx('click'); startRun(); return; }
     if (state !== 'RUNNING') return;
     const k = e.key;
     if (pressed && (k === 'ArrowLeft' || k === 'a' || k === 'A' || k === 'ArrowUp' || k === 'w' || k === 'W')) {
@@ -234,17 +252,32 @@
     const rect = canvas.getBoundingClientRect();
     const sx = (e.clientX - rect.left) * (1920 / rect.width);
     const sy = (e.clientY - rect.top) * (1080 / rect.height);
-    if (state === 'MENU' || state === 'GAMEOVER') { startRun(); return; }
+    if (state === 'MENU' || state === 'GAMEOVER') { sfx('click'); startRun(); return; }
     tapLane(sy);
   });
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
 
-  document.getElementById('btnStart').onclick = () => { ensureAudio(); startRun(); };
-  document.getElementById('btnResume').onclick = resumeGame;
-  document.getElementById('btnMenuPause').onclick = () => { state = 'MENU'; bgmStop(); show('menu'); };
-  document.getElementById('btnRevive').onclick = () => { if (state === 'GAMEOVER' && !question) startQuestion(); };
-  document.getElementById('btnRestart').onclick = startRun;
+  // ---------- UI wiring ----------
+  // Start screen buttons
+  document.getElementById('btnStart').onclick = () => { sfx('click'); ensureAudio(); startRun(); };
+  document.getElementById('btnSettings').onclick = () => { sfx('click'); showPanel('settings'); };
+  document.getElementById('btnHowTo').onclick = () => { sfx('click'); showPanel('howto'); };
+  document.getElementById('btnScore').onclick = () => { sfx('click'); showPanel('settings'); if (els.best) els.best.textContent = fmt(bestScore); };
+
+  // Panel closes
+  document.getElementById('panelSettingsClose').onclick = () => { sfx('click'); showPanel(null); };
+  document.getElementById('panelHowToClose').onclick = () => { sfx('click'); showPanel(null); };
+
+  // Settings toggles
+  document.getElementById('togMusic').onchange = (e) => { sfx('click'); bgmOn = e.target.checked; if (!bgmOn) bgmStop(); else if (state === 'RUNNING') bgmStart(); };
+  document.getElementById('togSfx').onchange = (e) => { sfx('click'); audioOn = e.target.checked; };
+
+  // In-game buttons
+  document.getElementById('btnResume').onclick = () => { sfx('click'); resumeGame(); };
+  document.getElementById('btnMenuPause').onclick = () => { sfx('click'); backToMenu(); };
+  document.getElementById('btnRevive').onclick = () => { sfx('click'); if (state === 'GAMEOVER' && !question) startQuestion(); };
+  document.getElementById('btnRestart').onclick = () => { sfx('click'); startRun(); };
   document.getElementById('btnPause').onclick = pauseGame;
 
   // ---------- loop ----------
@@ -373,6 +406,10 @@
     frame(now);
     requestAnimationFrame(step);
   });
+
+  // init
+  loadBest();
+  if (els.best) els.best.textContent = fmt(bestScore);
 
   // question timer (runs independently of state)
   setInterval(() => tickQuestion(0.1), 100);
