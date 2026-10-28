@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Khotwa — Prototype (Arabic anti-addiction endless runner)</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Tahoma, Arial, sans-serif;
+  overflow: hidden; touch-action: none; display: flex; align-items: center; justify-content: center; }
+#stage { position: relative; width: 1920px; height: 1080px; max-width: 100vw; max-height: 100vh; }
+canvas { display: block; width: 100%; height: 100%; }
+.overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 18px; z-index: 20; }
+.overlay.visible { display: flex; }
+.btn { appearance: none; border: 0; border-radius: 14px; padding: 14px 36px; font: 700 30px system-ui; color: #fff;
+  cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.btn.green { background: #22c55e; } .btn.blue { background: #2563eb; } .btn.red { background: #ef4444; }
+.btn:active { transform: translateY(2px); }
+#hud { position: absolute; left: 30px; top: 24px; pointer-events: none; }
+#hud-health { position: absolute; right: 30px; top: 24px; width: 420px; height: 44px; border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.4); pointer-events: none; }
+#hud-fill { height: 100%; width: 100%; background: #22c55e; transition: width 0.15s, background 0.15s; }
+#rotate { position: fixed; inset: 0; background: #070b0f; z-index: 50; display: none; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+@media (orientation: portrait) { #rotate { display: flex; } }
+.small { font-size: 14px; opacity: 0.75; }
+.qpanel { background: rgba(12, 20, 41, 0.97); border: 3px solid rgba(59, 130, 246, 0.8); border-radius: 26px;
+  padding: 32px; width: min(1100px, 92vw); max-height: 92vh; overflow-y: auto; text-align: center; }
+.qtitle { font: 700 40px system-ui; color: #59ebff; margin-bottom: 10px; }
+.qtext { font: 28px Tahoma, Arial, sans-serif; line-height: 1.5; margin: 18px 0 26px; direction: rtl; }
+.qtime { font: 700 32px system-ui; color: #fbbf24; margin-bottom: 24px; }
+.qopts { display: grid; gap: 14px; }
+.qopts button { text-align: right; padding: 14px 22px; font: 26px Tahoma, Arial, sans-serif; border-radius: 12px;
+  border: 0; cursor: pointer; color: #fff; }
+</style>
+</head>
+<body>
+<div id="rotate"><div>العب بالوضع الأفقي<br><small>Please rotate your device to landscape</small></div></div>
+<div id="stage">
+<canvas id="canvas" width="1920" height="1080"></canvas>
+
+<div id="hud">
+  <div style="font: 700 34px system-ui; color: #ffd933; text-shadow: 0 2px 0 #000;">SCORE: <span id="score">0</span></div>
+  <div style="margin-top: 10px; font: 700 24px system-ui; color: #fff; text-shadow: 0 2px 0 #000;">COINS: <span id="coins">x 0</span></div>
+  <div class="small" style="margin-top: 6px; opacity: 0.8;">SPEED: <span id="speed">0</span> px/s</div>
+</div>
+<div id="hud-health"><div id="hud-fill"></div></div>
+<button id="btnPause" style="position:absolute; right:30px; top:88px; appearance:none; border:0; border-radius:12px; padding:12px 20px; font:700 22px system-ui; color:#fff; background:rgba(31,41,55,0.8); cursor:pointer; pointer-events:auto;">II</button>
+
+<div id="menu" class="overlay visible">
+  <div style="font: 800 72px system-ui; letter-spacing: 2px; text-shadow: 0 4px 0 #000; margin-bottom: 10px;">KHOTWA</div>
+  <div class="small" style="text-align: center; max-width: 700px; line-height: 1.6;">خطوة نحو التعافي — اجمع النقود والثمار والأطعمة الصحية، وتجنب المخدرات. إذا نفدت صحتك، أجب على سؤال صحي للعودة إلى اللعب.</div>
+  <button class="btn green" id="btnStart">ابدأ / START</button>
+</div>
+
+<div id="pause" class="overlay">
+  <div style="font: 800 64px system-ui;">مؤقتاً</div>
+  <button class="btn green" id="btnResume">استئناف / RESUME</button>
+  <button class="btn blue" id="btnMenuPause">القائمة الرئيسية</button>
+</div>
+
+<div id="gameover" class="overlay">
+  <div style="font: 800 72px system-ui; color: #ef4444;">انتهت اللعبة</div>
+  <div style="font: 32px system-ui;">النتيجة النهائية: <span id="finalScore">0</span></div>
+  <button class="btn green" id="btnRevive">إحياء بالسؤال الصحي</button>
+  <button class="btn blue" id="btnRestart">بدء من جديد / RESTART</button>
+</div>
+
+<div id="question" class="overlay">
+  <div class="qpanel">
+    <div class="qtitle">فحص صحي</div>
+    <div class="qtext" id="qText">—</div>
+    <div class="qtime" id="qTime">الوقت المتبقي: 15</div>
+    <div class="qopts" id="qOpts"></div>
+    <div class="small" id="qResult" style="margin-top: 14px; min-height: 22px;"></div>
+  </div>
+</div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
