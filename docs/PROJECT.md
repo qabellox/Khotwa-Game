@@ -64,29 +64,27 @@ disables Vercel Git deploys for `main`.
 
 ## Costs
 
-Two different products. The numbers below are for the **store-quality Android release**, not the
-current prototype (which cost $0 in models and 20-60 hours to build).
+Measured baseline from the local OpenCode database: the Khotwa sessions on 27-28 Oct 2026 used
+3.43M input, 0.42M output, 0.64M reasoning and 102.6M cache-read tokens. At frontier-standard
+prices that is **~$100**; at fast-tier **~$250**; at Opus-class prices **~$285**. That covered
+the prototype audit, the comfort fix, the web shell, CI, deployment and mobile testing.
 
-| Scenario | Hours | Model spend | Other cash (art/audio, devices, QA, store) | Total cash |
+A store-quality build is 4-8x that agent work (6k-15k lines, 3-8 biomes, 15-25 screens, Android
+target), while art polish and device QA stay human-heavy.
+
+| Scenario | Model spend | Other cash | Total (no salary) | Time |
 | --- | --- | --- | --- | --- |
-| Lean: mixed model tiers, heavy caching, AI art + cleanup, self-QA | 200-250 | $700-$1,800 | $1,500-$3,500 | **$2.5k-$5.5k** |
-| Standard: frontier model for design/code, some commissioned art | 300-400 | $2,000-$4,500 | $3,500-$7,000 | **$6k-$12k** |
-| Premium: frontier-pro, heavy regeneration, commissioned art/audio, multi-device QA | 450-700 | $8,000-$20,000 | $10,000-$25,000 | **$20k-$45k** |
+| Lean: standard tier, AI art + cleanup, self-QA | $400-$1,000 | $300-$700 | **$0.7k-$1.7k** | 250-300 h |
+| Standard: mixed tiers, some commissioned art/audio | $900-$2,000 | $1,000-$3,000 | **$2k-$5k** | 300-400 h |
+| Premium: heavy regeneration, commissioned art/audio, multi-device QA | $2,000-$4,000 | $4,000-$10,000 | **$6k-$14k** | 400-600 h |
 
-Model math: agentic coding burns roughly 0.6M-2M tokens per productive hour. 300 hours at 1M
-tokens/hour is ~300M tokens. At frontier-standard pricing ($5/M input, $30/M output) with 60%
-cache hits, that is about $2k; at frontier-pro pricing ($30/M input, $180/M output) without
-cache discounts it is $15k+ for the same work.
+Planning number for the standard path: **$3k-$5k cash and ~350 hours**, of which **$1k-$2k is
+models**. Cache pricing dominates: the same 102.6M cache reads cost $51 on a standard tier and
+$3,077 on a pro tier without cache discounts, so use pro models only for isolated hard problems.
 
-Add-on cash items: Google Play Console $25 one-time; low-end test device $150-$400; optional
-iOS $99/year; privacy policy and store assets mostly time. New personal Play accounts also need
-12 testers for 14 continuous days before production access.
-
-A stronger model compresses the coding loop, not art direction, game-feel tuning, device QA or
-store compliance. Those remain the schedule risk.
-
-Running the web version: Vercel Hobby $0 (100 GB/month, ~4,000 first loads, non-commercial);
-Pro $20/month for 1 TB and commercial use. A Play release has no hosting bill.
+Play costs: $25 one-time console, $150-$400 low-end test device, 12 testers for 14 continuous
+days on new personal accounts, optional iOS $99/year. A stronger model compresses code work, not
+art direction, game-feel tuning, device QA or store compliance.
 
 ## Agent team
 

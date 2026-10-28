@@ -130,60 +130,72 @@ godot --headless --path khotwa --export-release "Web" ..\dist\web\index.html
 
 ## 9. What it costs
 
-Two different products, two very different budgets. Do not use the prototype number for the store release.
+### Measured baseline (this project, 27-28 Oct 2026)
 
-| | Prototype (this repo today) | Store-quality Android release (target) |
-| --- | --- | --- |
-| Code | ~1.8k lines, one scene | 6k-15k lines + data-driven content |
-| Art | 19 assets, 1 biome | 150-400 assets, 3-8 biomes, 500-1,500 animation frames |
-| UI | 6 overlays | 15-25 screens (shop, missions, settings, tutorial, consent) |
-| Systems | score, health, quiz revive | meta progression, missions, currency, skins, save, leaderboard, analytics, crash reporting |
-| Language | English HUD + Arabic quiz | full AR/EN with RTL, accessibility |
-| Platform | browser | signed AAB on Google Play, target API, data safety, content rating, closed testing |
-| Model spend | $0 on free tiers | **$1k-$8k** |
-| Human time | 20-60 h | **250-700 h** |
+From the local OpenCode database, the Khotwa sessions (prototype audit, camera/scroll fix, web
+shell, CI pipeline, Vercel promotion, mobile testing, docs) consumed:
 
-### Model price anchors (provider catalog, Oct 2026, per 1M tokens)
+| Metric | Tokens |
+| --- | --- |
+| Input | 3.43M |
+| Output | 0.42M |
+| Reasoning | 0.64M |
+| Cache read | 102.6M |
 
-| Tier | Example | Input | Output | Cache read |
+Converted to frontier prices, that entire body of work costs:
+
+| Tier | Input | Output | Cache read | Total |
 | --- | --- | --- | --- | --- |
-| Frontier standard | `openai/gpt-5.5` | $5 | $30 | $0.50 |
-| Frontier fast | `openai/gpt-5.5-fast` | $12.50 | $75 | $1.25 |
-| Frontier pro | `openai/gpt-5.5-pro` | $30 | $180 | not discounted |
-| Opus-class (estimate) | - | ~$15 | ~$75 | ~$1.50 |
+| `gpt-5.5` ($5/$30/$0.50) | $17 | $32 | $51 | **~$100** |
+| `gpt-5.5-fast` ($12.50/$75/$1.25) | $43 | $79 | $128 | **~$250** |
+| Opus-class estimate ($15/$75/$1.50) | $51 | $79 | $154 | **~$285** |
 
-Anthropic models are not in this installation's catalog; the table is the frontier band to budget with, not a quote for any one model.
+**Two intense days of frontier-assisted work cost $100-$285 in tokens.** That is the calibration
+point. It is also why the first "prototype" estimate was not crazy, and why agency-style
+production numbers look inflated for solo vibe coding.
 
-### Token math
+### Store build = baseline x scope multiplier
 
-Agentic coding (file reads, edits, test loops) consumes roughly **0.6M-2M tokens per productive hour** depending on how much context and how many retries. A 300-hour build at 1M tokens/hour is ~300M tokens, split ~85/15 input/output = 255M in + 45M out.
+A store build has 4-8x the agent work (6k-15k lines, 3-8 biomes, 15-25 screens, Android target),
+but art polish and device QA are human-heavy, not token-heavy.
 
-| Scenario | Hours | Tokens | Model spend | Other cash | Total cash |
+| Scenario | Scope x | Model spend | Other cash | Total (no salary) | Time |
 | --- | --- | --- | --- | --- | --- |
-| Lean: mixed tiers, heavy caching, AI art with cleanup, self-QA | 200-250 | 120-200M | $700-$1,800 | $1,500-$3,500 | **$2.5k-$5.5k** |
-| Standard: frontier standard for architecture/code, 60% cache, some commissioned art/audio | 300-400 | 300-500M | $2,000-$4,500 | $3,500-$7,000 | **$6k-$12k** |
-| Premium: frontier-pro, heavy regeneration, commissioned art/audio, multi-device QA | 450-700 | 600M-1.2B | $8,000-$20,000 | $10,000-$25,000 | **$20k-$45k** |
+| Lean: standard tier, AI art + cleanup, self-QA | 4x | $400-$1,000 | $300-$700 | **$0.7k-$1.7k** | 250-300 h |
+| Standard: mixed tiers, some commissioned art/audio | 6x | $900-$2,000 | $1,000-$3,000 | **$2k-$5k** | 300-400 h |
+| Premium: heavy regeneration, commissioned art/audio, multi-device QA | 10x | $2,000-$4,000 | $4,000-$10,000 | **$6k-$14k** | 400-600 h |
 
-Why the top row explodes: output tokens at $180/M dominate, regeneration is normal in a polish loop, and cache discounts do not apply to output.
+Planning number for the standard path: **$3k-$5k cash and ~350 hours**. Cash here excludes
+your own labour; with AI-generated art the "other cash" can stay near the low end.
 
-Subscription route: a $100-$200/month plan for 4-8 months is $400-$1,600, but rate limits stretch the calendar; budget $500-$1,500 of API overflow for heavy weeks.
+### The pro-tier trap
+
+`gpt-5.5-pro` has no cache-read discount. The same 102.6M cache reads that cost $51 on standard
+cost **$3,077** on pro. Use pro only for isolated hard problems; never as the daily driver.
+Long agentic sessions are cache-read dominated, so cache pricing matters more than headline
+input price.
 
 ### Google Play line items
 
-- Play Console: **$25 one-time**.
-- New personal developer accounts: **12 testers for 14 continuous days** of closed testing before production access (calendar cost, not cash).
-- Privacy policy, data safety form, content rating, ads declaration: mostly time.
-- Firebase/Play Games free tiers are enough for a small game; cloud save and leaderboards add engineering, not much money.
-- iOS later: $99/year plus a Mac.
-- Device coverage: at least one low-end Android for real testing ($150-$400).
+- Play Console **$25 one-time**.
+- New personal accounts: **12 testers for 14 continuous days** of closed testing before production.
+- Low-end test device **$150-$400**.
+- iOS later: **$99/year** plus a Mac.
+- Privacy policy, data safety, content rating: time, not money.
 
 ### What a stronger model does not fix
 
-Art direction and consistency across hundreds of assets, game-feel tuning, real-device QA, store compliance, and retention design. A better brain shortens the coding loop; it does not remove the curation, playtesting and platform work. Budget those explicitly or the schedule slips.
+Art direction and consistency, game-feel tuning, real-device QA, Play compliance, retention
+design. A better brain shortens the code loop; those remain the schedule risk.
 
-**Rule of thumb:** store-quality costs **$8k-$14k cash and 300-500 hours** in the typical case. The model bill alone is ~$2k-$4k; the rest is art/audio, devices, QA and contingency. My earlier $30-$250 figure was prototype-only and is wrong for this target.
+**Rule of thumb:** store-quality via vibe coding is **$2k-$5k cash and 300-400 hours** typical,
+with **$1k-$2k of that being models**. The earlier $8k-$14k figure assumed commissioning most
+art/audio and agency-style buffers; the earlier $30-$250 figure priced only the current
+prototype.
 
-**Running cost after launch** (web build): Vercel Hobby is $0 but 100 GB/month and non-commercial only; Pro $20/month gives 1 TB and commercial use. A first visit is ~25 MB, so Hobby supports roughly 4,000 first loads/month. A Play Store release has no hosting bill; Google takes 15% of the first $1M/year in revenue, then 30%.
+**Running cost after launch:** Vercel Hobby is $0 but 100 GB/month and non-commercial only; Pro
+$20/month gives 1 TB and commercial use. A Play release has no hosting bill; Google takes 15% of
+the first $1M/year in revenue, then 30%.
 
 ## 10. The agent team
 
