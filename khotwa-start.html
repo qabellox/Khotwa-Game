@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khotwa - Break Free</title>
+  <style>
+    /* HTML5 boilerplate - no Godot, pure canvas/web */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d12; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; touch-action: none; }
+    
+    /* Start screen container */
+    #start-screen {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, #ff8c42 0%, #e65c3a 30%, #ff2d6e 60%, #9b59b6 100%);
+    }
+    
+    /* Runner sprite - floats gently */
+    #runner {
+      width: 200px; height: 300px; 
+      position: absolute; 
+      pointer-events: none;
+      animation: float 3s ease-in-out infinite;
+      mix-blend-mode: screen;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+    
+    /* Start button - pulses */
+    #start-button {
+      position: relative; padding: 24px 48px; 
+      font-size: 32px; font-weight: 700; 
+      color: #fff; background: transparent;
+      border: 4px solid #ffd140; border-radius: 12px;
+      cursor: pointer; z-index: 10;
+      transition: all 0.3s ease;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 209, 64, 0.5); }
+      50% { transform: scale(1.08); box-shadow: 0 0 30px rgba(255, 209, 64, 0.8); }
+    }
+    
+    #start-button:hover { transform: scale(1.05); }
+    
+    /* Hit area - invisible but catches clicks */
+    #start-hit-area {
+      position: fixed; inset: 0; z-index: 99;
+      cursor: pointer;
+    }
+    
+    /* Game area (canvas) */
+    #game-canvas {
+      position: fixed; inset: 0; z-index: 1;
+      background: #0b0d12;
+    }
+    
+    /* Instructions */
+    #instructions {
+      margin-top: 32px; color: #fff; text-align: center;
+      max-width: 80%; line-height: 1.6;
+    }
+    
+    .alert-banner {
+      background: rgba(0,0,0,0.8); padding: 16px; border-radius: 8px;
+      margin: 16px 0; color: #ffd140; min-height: 40px;
+      display: flex; align-items: center; justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- Invisible hit area for start button -->
+  <div id="start-hit-area"></div>
+  
+  <!-- Start screen -->
+  <div id="start-screen">
+    <!-- Runner sprite (using generated asset) -->
+    <img id="runner" src="khotwa/assets/generated/sprites/runner.png" 
+         alt="Khotwa runner" 
+         style="width: 200px; height: auto; transform: translateX(-50%);">
+    
+    <!-- Start button -->
+    <button id="start-button">START GAME</button>
+    
+    <!-- Instructions -->
+    <div id="instructions">
+      <p>Dodge drugs and junk food, collect healthy items</p>
+      <p>Answer awareness questions to revive after death</p>
+      <p>Use Arrow keys or tap lanes to move</p>
+    </div>
+  </div>
+  
+  <!-- Game canvas (Godot web export or custom) -->
+  <canvas id="game-canvas"></canvas>
+  
+  <script>
+    // Start screen interaction
+    const startScreen = document.getElementById('start-screen');
+    const startButton = document.getElementById('start-button');
+    const hitArea = document.getElementById('start-hit-area');
+    const gameCanvas = document.getElementById('game-canvas');
+    
+    // Start button click handler
+    function startGame() {
+      // Hide start screen
+      startScreen.style.display = 'none';
+      
+      // Show canvas or start the game
+      gameCanvas.style.display = 'block';
+      
+      // Dispatch custom event that the Godot engine or game logic can listen for
+      const startEvent = new CustomEvent('khotwa:start', { detail: { source: 'ui' } });
+      document.dispatchEvent(startEvent);
+      
+      console.log('Khotwa game started from UI');
+    }
+    
+    // Click handlers - both the button and the invisible hit area
+    startButton.addEventListener('click', startGame);
+    hitArea.addEventListener('click', startGame);
+    
+    // Keyboard shortcut - Enter or Space to start
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        startGame();
+      }
+    });
+    
+    // Initialize: hide canvas initially, show start screen
+    gameCanvas.style.display = 'none';
+    
+    // Try to load the Godot web export or set up custom game loop
+    // If Godot is available, start it; otherwise, show a simple animation
+    document.addEventListener('DOMContentLoaded', () => {
+      // Check if Godot bootstrap is available
+      if (window.__khotwaStart) {
+        // Godot engine is loading; listen for its start signal
+        document.addEventListener('khotwa:start', () => {
+          console.log('Engine start signal received');
+        });
+      } else {
+        // No Godot; set up a simple animation loop as placeholder
+        console.log('No Godot engine - using custom startup');
+        
+        // Simple animation loop placeholder
+        let lastTime = 0;
+        function animate(time) {
+          requestAnimationFrame(animate);
+          // Placeholder: just rotate the canvas background
+          const t = time / 1000;
+          gameCanvas.style.background = `radial-gradient(circle at ${300 + 100*Math.sin(t)}px ${200 + 100*Math.cos(t)}px, #1a1d26, #0b0d12)`;
+        }
+        requestAnimationFrame(animate);
+      }
+    });
+  </script>
+</body>
+</html>
