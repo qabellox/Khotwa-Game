@@ -64,22 +64,29 @@ disables Vercel Git deploys for `main`.
 
 ## Costs
 
-Estimates in USD, October 2026, for this exact scope.
+Two different products. The numbers below are for the **store-quality Android release**, not the
+current prototype (which cost $0 in models and 20-60 hours to build).
 
-| Route | Cost |
-| --- | --- |
-| Godot endless-runner template | $10-$80 (before reskin, quiz, Arabic, web shell) |
-| Freelancer, low-cost market | $1,500-$4,000 |
-| Freelancer, US/EU | $6,000-$20,000 |
-| Small agency | $20,000-$60,000 |
-| Rebuilding by vibe coding on free models | $0 in models, 20-60 hours of human time |
-| Rebuilding with paid chat subscriptions | $20-$40/month for 2-6 weeks |
-| Rebuilding with pay-as-you-go API | $30-$250 total |
+| Scenario | Hours | Model spend | Other cash (art/audio, devices, QA, store) | Total cash |
+| --- | --- | --- | --- | --- |
+| Lean: mixed model tiers, heavy caching, AI art + cleanup, self-QA | 200-250 | $700-$1,800 | $1,500-$3,500 | **$2.5k-$5.5k** |
+| Standard: frontier model for design/code, some commissioned art | 300-400 | $2,000-$4,500 | $3,500-$7,000 | **$6k-$12k** |
+| Premium: frontier-pro, heavy regeneration, commissioned art/audio, multi-device QA | 450-700 | $8,000-$20,000 | $10,000-$25,000 | **$20k-$45k** |
 
-Running costs: Vercel Hobby $0 (100 GB transfer/month, ~4,000 first loads, non-commercial
-only); Vercel Pro $20/month (1 TB, commercial); GitHub $0 (public repo); Godot $0; optional
-domain $10-$20/year. A first visit downloads about 25 MB, so bandwidth is the first limit a
-large launch would hit.
+Model math: agentic coding burns roughly 0.6M-2M tokens per productive hour. 300 hours at 1M
+tokens/hour is ~300M tokens. At frontier-standard pricing ($5/M input, $30/M output) with 60%
+cache hits, that is about $2k; at frontier-pro pricing ($30/M input, $180/M output) without
+cache discounts it is $15k+ for the same work.
+
+Add-on cash items: Google Play Console $25 one-time; low-end test device $150-$400; optional
+iOS $99/year; privacy policy and store assets mostly time. New personal Play accounts also need
+12 testers for 14 continuous days before production access.
+
+A stronger model compresses the coding loop, not art direction, game-feel tuning, device QA or
+store compliance. Those remain the schedule risk.
+
+Running the web version: Vercel Hobby $0 (100 GB/month, ~4,000 first loads, non-commercial);
+Pro $20/month for 1 TB and commercial use. A Play release has no hosting bill.
 
 ## Agent team
 

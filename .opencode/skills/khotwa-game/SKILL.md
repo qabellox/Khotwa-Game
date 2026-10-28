@@ -130,40 +130,60 @@ godot --headless --path khotwa --export-release "Web" ..\dist\web\index.html
 
 ## 9. What it costs
 
-All figures are estimates in USD, dated Oct 2026, and assume this exact scope (one scene, ~1.1k lines of gameplay code, 10 quiz questions, ~19 MB of art/audio, mobile web export, CI/CD).
+Two different products, two very different budgets. Do not use the prototype number for the store release.
 
-**Buying the finished thing**
-
-| Route | Typical cost | Notes |
+| | Prototype (this repo today) | Store-quality Android release (target) |
 | --- | --- | --- |
-| Off-the-shelf Godot endless-runner template | $10-$80 | Would still need reskin, quiz system, Arabic content, web shell. |
-| Freelancer, low-cost market | $1,500-$4,000 | ~100-200 h at $15-$25/h. |
-| Freelancer, US/EU | $6,000-$20,000 | ~100-250 h at $50-$80/h. |
-| Small agency | $20,000-$60,000 | Includes design, QA, PM overhead. |
-| Buying an existing finished game outright | $3,000-$10,000 | No real market price; bespoke work-for-hire range. |
+| Code | ~1.8k lines, one scene | 6k-15k lines + data-driven content |
+| Art | 19 assets, 1 biome | 150-400 assets, 3-8 biomes, 500-1,500 animation frames |
+| UI | 6 overlays | 15-25 screens (shop, missions, settings, tutorial, consent) |
+| Systems | score, health, quiz revive | meta progression, missions, currency, skins, save, leaderboard, analytics, crash reporting |
+| Language | English HUD + Arabic quiz | full AR/EN with RTL, accessibility |
+| Platform | browser | signed AAB on Google Play, target API, data safety, content rating, closed testing |
+| Model spend | $0 on free tiers | **$1k-$8k** |
+| Human time | 20-60 h | **250-700 h** |
 
-**Building it by vibe coding (AI-assisted, as done here)**
+### Model price anchors (provider catalog, Oct 2026, per 1M tokens)
 
-| Item | Cost | Notes |
-| --- | --- | --- |
-| Models on free tiers (current setup) | $0 | All six agents currently run on free models. |
-| Chat subscriptions (Claude Pro / ChatGPT Plus) | $20-$40 per month | 2-6 weeks of part-time iteration. |
-| Pay-as-you-go API tokens | $30-$250 total | Roughly 2-10M tokens for build + debugging + docs. |
-| Human time | 20-60 hours | The dominant real cost. |
+| Tier | Example | Input | Output | Cache read |
+| --- | --- | --- | --- | --- |
+| Frontier standard | `openai/gpt-5.5` | $5 | $30 | $0.50 |
+| Frontier fast | `openai/gpt-5.5-fast` | $12.50 | $75 | $1.25 |
+| Frontier pro | `openai/gpt-5.5-pro` | $30 | $180 | not discounted |
+| Opus-class (estimate) | - | ~$15 | ~$75 | ~$1.50 |
 
-**Running it**
+Anthropic models are not in this installation's catalog; the table is the frontier band to budget with, not a quote for any one model.
 
-| Item | Cost | Limit that matters |
-| --- | --- | --- |
-| Vercel Hobby | $0 | 100 GB fast data transfer/month, 1M CDN requests; **non-commercial use only**. |
-| Vercel Pro | $20/month | 1 TB transfer, commercial use allowed. |
-| GitHub | $0 | Public repo, unlimited Actions minutes. |
-| Godot | $0 | MIT. |
-| Custom domain | $10-$20/year | Optional; the `vercel.app` URL is free. |
-| Google Play / App Store | $25 once / $99 per year | Only if packaged as a native app. |
-| Commissioned art/audio (if replacing assets) | $300-$2,000 | Character sheet, 5 items, background, icons, 5 sounds. |
+### Token math
 
-**Bandwidth reality:** a first visit downloads roughly 25 MB (9.5 MB brotli wasm + 15.6 MB pck + HTML/JS). On Hobby's 100 GB that is about **4,000 new player loads per month**; on Pro's 1 TB about 40,000. Repeat visits are cached by ETag but still count transfer when the cache revalidates. This is the first limit a viral launch would hit.
+Agentic coding (file reads, edits, test loops) consumes roughly **0.6M-2M tokens per productive hour** depending on how much context and how many retries. A 300-hour build at 1M tokens/hour is ~300M tokens, split ~85/15 input/output = 255M in + 45M out.
+
+| Scenario | Hours | Tokens | Model spend | Other cash | Total cash |
+| --- | --- | --- | --- | --- | --- |
+| Lean: mixed tiers, heavy caching, AI art with cleanup, self-QA | 200-250 | 120-200M | $700-$1,800 | $1,500-$3,500 | **$2.5k-$5.5k** |
+| Standard: frontier standard for architecture/code, 60% cache, some commissioned art/audio | 300-400 | 300-500M | $2,000-$4,500 | $3,500-$7,000 | **$6k-$12k** |
+| Premium: frontier-pro, heavy regeneration, commissioned art/audio, multi-device QA | 450-700 | 600M-1.2B | $8,000-$20,000 | $10,000-$25,000 | **$20k-$45k** |
+
+Why the top row explodes: output tokens at $180/M dominate, regeneration is normal in a polish loop, and cache discounts do not apply to output.
+
+Subscription route: a $100-$200/month plan for 4-8 months is $400-$1,600, but rate limits stretch the calendar; budget $500-$1,500 of API overflow for heavy weeks.
+
+### Google Play line items
+
+- Play Console: **$25 one-time**.
+- New personal developer accounts: **12 testers for 14 continuous days** of closed testing before production access (calendar cost, not cash).
+- Privacy policy, data safety form, content rating, ads declaration: mostly time.
+- Firebase/Play Games free tiers are enough for a small game; cloud save and leaderboards add engineering, not much money.
+- iOS later: $99/year plus a Mac.
+- Device coverage: at least one low-end Android for real testing ($150-$400).
+
+### What a stronger model does not fix
+
+Art direction and consistency across hundreds of assets, game-feel tuning, real-device QA, store compliance, and retention design. A better brain shortens the coding loop; it does not remove the curation, playtesting and platform work. Budget those explicitly or the schedule slips.
+
+**Rule of thumb:** store-quality costs **$8k-$14k cash and 300-500 hours** in the typical case. The model bill alone is ~$2k-$4k; the rest is art/audio, devices, QA and contingency. My earlier $30-$250 figure was prototype-only and is wrong for this target.
+
+**Running cost after launch** (web build): Vercel Hobby is $0 but 100 GB/month and non-commercial only; Pro $20/month gives 1 TB and commercial use. A first visit is ~25 MB, so Hobby supports roughly 4,000 first loads/month. A Play Store release has no hosting bill; Google takes 15% of the first $1M/year in revenue, then 30%.
 
 ## 10. The agent team
 
