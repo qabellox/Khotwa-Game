@@ -4,6 +4,9 @@ This is the durable, git-tracked summary of what Khotwa is and how the project r
 machine-readable context for agents lives in `.opencode/skills/khotwa-game/SKILL.md`; this file
 is the human-readable equivalent.
 
+The route from this prototype to a store-quality Android release - milestones, gates, model
+routing and scope corrections - is in `docs/BUILD-PLAN.md`.
+
 ## What it is
 
 Khotwa (خطوة, "a step") is a 2D endless runner made with **Godot 4.7.2** and exported to the

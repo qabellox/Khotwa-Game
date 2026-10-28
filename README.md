@@ -18,6 +18,8 @@ within 15 seconds.
 ## Project context
 
 - `docs/PROJECT.md` - what the game is, how it plays, architecture, costs and the agent team.
+- `docs/BUILD-PLAN.md` - how to reach a store-quality Android release: milestones, gates, and
+  which model tier to use for which part of the work.
 - `.opencode/skills/khotwa-game/SKILL.md` - the same context for AI agents.
 - `.opencode/agents/` - the agent definitions (`feedback`, `orchestrator`, `thinker`,
   `asset-pipeline`, `builder`, `tester`).
