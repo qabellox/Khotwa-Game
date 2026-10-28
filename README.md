@@ -4,13 +4,11 @@ Khotwa (Break Free) is a 2D endless runner built in Godot 4.7.
 
 ## Play
 
-| Purpose | URL |
-| --- | --- |
-| Production (current build) | https://web-seven-iota-32.vercel.app/ |
-| Preview (same build) | https://khotwa-preview.vercel.app/ |
+**https://khotwa-preview.vercel.app/**
 
-Both serve the public web export, so they are playable from any phone, tablet or desktop
-browser — no local install needed. The game runs landscape only and asks you to rotate.
+This is the only hosted copy. It serves the public web export, so it is playable from any
+phone, tablet or desktop browser — no local install needed. The game runs landscape only and
+asks you to rotate.
 
 ## Open the project
 
@@ -39,4 +37,10 @@ built artifacts.
 vercel deploy --prod --yes --non-interactive
 ```
 
-The preview and production Vercel projects are both under the `port-nova` team.
+The project is hosted in Vercel project `khotwa-preview` under the `port-nova` team.
+Link the folder once, then deploy:
+
+```powershell
+vercel link --project khotwa-preview --scope port-nova --yes
+vercel deploy --prod --yes --non-interactive
+```
