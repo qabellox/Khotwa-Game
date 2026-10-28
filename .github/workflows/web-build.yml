@@ -1,0 +1,76 @@
+name: Web build
+
+# Any push to main (including edits made from a phone on github.com) rebuilds the
+# Godot web export and publishes it to the `web-build` branch. Vercel serves that
+# branch, so the hosted game always matches main.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot editor
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Install Godot
+        run: |
+          set -euo pipefail
+          if [ ! -x "$HOME/godot/godot" ]; then
+            mkdir -p "$HOME/godot"
+            curl -fsSL -o /tmp/godot.zip \
+              "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+            unzip -q -o /tmp/godot.zip -d "$HOME/godot"
+            mv "$HOME/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$HOME/godot/godot"
+            chmod +x "$HOME/godot/godot"
+          fi
+          "$HOME/godot/godot" --version
+
+      - name: Install web export template
+        run: |
+          set -euo pipefail
+          dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dir"
+          cp tools/godot-templates/web_nothreads_release.zip "$dir/"
+          ls -l "$dir"
+
+      - name: Export web build
+        run: |
+          set -euo pipefail
+          mkdir -p dist/web
+          "$HOME/godot/godot" --headless --path khotwa --import
+          "$HOME/godot/godot" --headless --path khotwa --export-release "Web" "$GITHUB_WORKSPACE/dist/web/index.html"
+          test -f dist/web/index.pck
+          test -f dist/web/index.wasm
+          ls -l dist/web
+
+      - name: Publish build branch
+        run: |
+          set -euo pipefail
+          cd dist/web
+          git init -q -b web-build
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Web build from ${GITHUB_SHA}"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" web-build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
