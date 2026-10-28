@@ -28,12 +28,12 @@ func _ready() -> void:
 	_register_js_start()
 	get_tree().root.size_changed.connect(_on_size_changed)
 	_report("boot")
+	_show_start_screen_html()
 	for delay in [0.75, 2.5, 6.0, 12.0, 20.0]:
 		await get_tree().create_timer(delay).timeout
 		if delay == 2.5:
 			await _verify_ui_drawn()
 		_report("late")
-	_show_start_screen_html()
 
 
 func _process(delta: float) -> void:
