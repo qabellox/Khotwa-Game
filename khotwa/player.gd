@@ -58,6 +58,9 @@ const LANE_X: = 960.0
 
 @export var move_speed: float = 14.0
 
+const LANE_FOLLOW_RATE: = 11.0
+const MAX_LANE_SLIDE_SPEED: = 560.0
+
 @onready var sprite: Sprite2D = $Sprite
 @onready var game_manager: GameManager = get_node("../GameManager")
 
@@ -238,7 +241,9 @@ func _apply_lane_slide(delta: float) -> void :
 
 
 
-	position.y = move_toward(position.y, target_y, move_speed * 60.0 * delta)
+	var remaining: = target_y - position.y
+	var eased: = remaining * (1.0 - exp(-LANE_FOLLOW_RATE * delta))
+	position.y += clampf(eased, -MAX_LANE_SLIDE_SPEED * delta, MAX_LANE_SLIDE_SPEED * delta)
 
 
 

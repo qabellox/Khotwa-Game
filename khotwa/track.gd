@@ -8,6 +8,7 @@ extends Node2D
 const VIEW_WIDTH: = 1920.0
 const VIEW_HEIGHT: = 1080.0
 const TRACK_TEXTURE: = "res://assets/railway.png"
+@export var scroll_speed_cap: = 640.0
 
 const SCROLL_SHADER: = "\r\nshader_type canvas_item;\r\n\r\nuniform float scroll;\r\nuniform float tile_w;\r\n\r\nvoid fragment() {\r\n\tvec2 uv = UV;\r\n\t// Tile the seamless loop horizontally so the track covers the full width,\r\n\t// while each tile is still drawn at its natural size (no stretching).\r\n\tuv.x = fract(uv.x / tile_w + scroll);\r\n\tCOLOR = texture(TEXTURE, uv);\r\n}\r\n"
 
@@ -67,5 +68,5 @@ func _process(delta: float) -> void :
 	if _texture == null or game_manager.state != GameManager.GameState.RUNNING:
 		return
 
-	_scroll = fmod(_scroll + game_manager.game_speed * delta * _scroll_per_px, 1.0)
+	_scroll = fmod(_scroll + minf(game_manager.game_speed, scroll_speed_cap) * delta * _scroll_per_px, 1.0)
 	_material.set_shader_parameter("scroll", _scroll)

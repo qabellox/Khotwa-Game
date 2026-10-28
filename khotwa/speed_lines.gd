@@ -9,6 +9,8 @@ const LINE_COUNT: = 20
 const VIEW_W: = 1920.0
 const SPAWN_W: = VIEW_W + 800.0
 
+@export var visual_speed_cap: = 640.0
+
 @onready var game_manager: GameManager = get_node("../GameManager")
 
 var _xs: Array[float] = []
@@ -24,7 +26,7 @@ func _ready() -> void :
 func _process(delta: float) -> void :
 	if game_manager.state != GameManager.GameState.RUNNING:
 		return
-	var speed: float = game_manager.game_speed
+	var speed: float = minf(game_manager.game_speed, visual_speed_cap)
 	for i in range(LINE_COUNT):
 		_xs[i] -= speed * 1.6 * delta
 		if _xs[i] < -400.0:
@@ -33,7 +35,7 @@ func _process(delta: float) -> void :
 
 
 func _draw() -> void :
-	var speed: float = game_manager.game_speed
+	var speed: float = minf(game_manager.game_speed, visual_speed_cap)
 	var line_len: = clampf(24.0 + speed * 0.04, 24.0, 96.0)
 	var alpha: = clampf(0.1 + speed / 2600.0, 0.1, 0.3)
 	var width: = clampf(1.0 + speed / 900.0, 1.0, 2.5)
