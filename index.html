@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, viewport-fit=cover">
+		<meta name="theme-color" content="#000000">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+		<title>Khotwa</title>
+		<script>
+/* Failure telemetry. Runs before the engine so every message the engine prints
+   is kept and can be shown on the phone that failed. Nothing here changes the
+   game; it only records what happened. */
+(function () {
+	var log = [];
+	window.__khotwaLog = log;
+	var state = window.__khotwaState = {
+		startedAt: (window.performance && performance.now) ? performance.now() : Date.now(),
+		errors: 0,
+		boot: null,
+		probe: null,
+	};
+
+	function now() {
+		var t = (window.performance && performance.now) ? performance.now() : Date.now();
+		return Math.max(0, Math.round(t - state.startedAt));
+	}
+
+	function flatten(args) {
+		var parts = [];
+		for (var i = 0; i < args.length; i++) {
+			var a = args[i];
+			if (a && a.stack) {
+				parts.push(String(a.stack));
+			} else if (a && typeof a === 'object') {
+				try { parts.push(JSON.stringify(a)); } catch (e) { parts.push(String(a)); }
+			} else {
+				parts.push(String(a));
+			}
+		}
+		return parts.join(' ');
+	}
+
+	function record(kind, text) {
+		try {
+			text = String(text == null ? '' : text).replace(/\s+/g, ' ').slice(0, 300);
+			log.push({ t: now(), kind: kind, text: text });
+			if (log.length > 80) { log.shift(); }
+			if (kind === 'error' || kind === 'pageerror' || kind === 'resource') { state.errors++; }
+			if (typeof window.__khotwaOnLog === 'function') { window.__khotwaOnLog(); }
+		} catch (e) { /* never throw from telemetry */ }
+	}
+
+	['log', 'info', 'warn', 'error'].forEach(function (level) {
+		var original = console[level];
+		if (!original) { return; }
+		console[level] = function () {
+			record(level, flatten(arguments));
+			try { original.apply(console, arguments); } catch (e) { /* ignore */ }
+		};
+	});
+
+	window.addEventListener('error', function (event) {
+		if (event && event.target && event.target !== window && event.target.tagName) {
+			var src = event.target.src || event.target.href || '';
+			record('resource', 'failed to load ' + src + ' (' + (event.target.tagName || '?') + ')');
+			return;
+		}
+		record('pageerror', (event && (event.message || event.error)) || 'unknown error');
+	}, true);
+
+	window.addEventListener('unhandledrejection', function (event) {
+		var reason = event && event.reason;
+		record('pageerror', 'unhandled rejection: ' + (reason && (reason.stack || reason.message) || reason));
+	});
+}());
+		</script>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+html, body {
+	width: 100%;
+	height: 100%;
+	height: 100dvh;
+	background-color: #000;
+	overscroll-behavior: none;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+	-webkit-tap-highlight-color: transparent;
+	position: fixed;
+	inset: 0;
+}
+
+#canvas {
+	display: block;
+	background-color: #000;
+	/* Godot sizes the drawing buffer from window.innerWidth/Height. Some Android
+	   browsers/WebViews report a layout viewport larger than the visible screen,
+	   which used to push the canvas (and the centred START button) off-screen.
+	   Pinning the CSS box to the page viewport keeps the whole game visible and
+	   lets pointer coordinates map correctly. */
+	width: 100% !important;
+	height: 100% !important;
+	max-width: 100%;
+	max-height: 100%;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: #000;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+	accent-color: #35c46a;
+}
+
+#status-slow {
+	position: absolute;
+	bottom: 17%;
+	left: 0;
+	right: 0;
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	justify-content: center;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	font-size: 14px;
+	color: rgba(255, 255, 255, 0.72);
+}
+
+#status-slow[hidden] {
+	display: none;
+}
+
+#status-slow button {
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 8px 18px;
+	font-size: 13px;
+	font-weight: 600;
+	font-family: inherit;
+	cursor: pointer;
+	background: #35c46a;
+	color: #06210f;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+
+#status-notice .status-reload {
+	margin-top: 14px;
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 10px 22px;
+	font-size: 15px;
+	font-weight: 600;
+	font-family: inherit;
+	cursor: pointer;
+	background: #35c46a;
+	color: #06210f;
+}
+
+/* ---------- Mobile presentation (outside the game canvas) ---------- */
+
+#rotate-hint {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 30;
+	background: radial-gradient(circle at 50% 35%, #16222c 0%, #070b0f 70%);
+	color: #fff;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+	align-items: center;
+	justify-content: center;
+	padding: 28px;
+	padding-top: max(28px, env(safe-area-inset-top));
+	padding-bottom: max(28px, env(safe-area-inset-bottom));
+	padding-left: max(28px, env(safe-area-inset-left));
+	padding-right: max(28px, env(safe-area-inset-right));
+	text-align: center;
+}
+
+@media (orientation: portrait) {
+	#rotate-hint { display: flex; }
+}
+
+.rotate-card { max-width: 340px; }
+
+.rotate-icon {
+	width: 84px;
+	height: 84px;
+	margin: 0 auto 18px auto;
+	display: block;
+	animation: rotate-tilt 2.6s ease-in-out infinite;
+	transform-origin: 50% 50%;
+}
+
+@keyframes rotate-tilt {
+	0%, 45% { transform: rotate(0deg); }
+	60%, 100% { transform: rotate(-90deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.rotate-icon { animation: none; transform: rotate(-90deg); }
+}
+
+.rotate-title {
+	font-size: 22px;
+	font-weight: 700;
+	letter-spacing: 0.2px;
+	margin-bottom: 6px;
+}
+
+.rotate-sub {
+	font-size: 18px;
+	font-weight: 600;
+	opacity: 0.9;
+	margin-bottom: 18px;
+	direction: rtl;
+}
+
+.rotate-note {
+	font-size: 13px;
+	opacity: 0.65;
+	margin-bottom: 22px;
+	line-height: 1.45;
+}
+
+.rotate-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+.rotate-actions button {
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 12px 22px;
+	font-size: 15px;
+	font-weight: 600;
+	font-family: inherit;
+	cursor: pointer;
+	background: #35c46a;
+	color: #06210f;
+}
+
+#compat-hint {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	background: #070b0f;
+	color: #fff;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+	align-items: center;
+	justify-content: center;
+	padding: 28px;
+	text-align: center;
+}
+
+body.no-webgl2 #compat-hint { display: flex; }
+
+#fatal-hint {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	background: #070b0f;
+	color: #fff;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+	align-items: center;
+	justify-content: center;
+	padding: 28px;
+	text-align: center;
+}
+
+body.graphics-lost #fatal-hint { display: flex; }
+
+#diag {
+	position: fixed;
+	inset: 0;
+	z-index: 120;
+	display: none;
+	flex-direction: column;
+	gap: 10px;
+	background: #060a0e;
+	color: #dbe7f0;
+	padding: 14px;
+	padding-top: max(14px, env(safe-area-inset-top));
+	padding-bottom: max(14px, env(safe-area-inset-bottom));
+	font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+body.diag-open #diag { display: flex; }
+
+#diag-title {
+	font: 700 16px/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+	margin: 0;
+}
+
+#diag-title span {
+	display: block;
+	font: 400 12px/1.4 system-ui, sans-serif;
+	opacity: 0.7;
+	margin-top: 3px;
+}
+
+#diag-body {
+	flex: 1;
+	overflow: auto;
+	margin: 0;
+	background: #0c141c;
+	border: 1px solid #1e2c3a;
+	border-radius: 10px;
+	padding: 10px;
+	white-space: pre-wrap;
+	word-break: break-word;
+	-webkit-user-select: text;
+	user-select: text;
+	-webkit-touch-callout: default;
+}
+
+#diag-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+#diag-actions button {
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 10px 16px;
+	font: 600 13px system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+	background: #2f9a63;
+	color: #f2fff8;
+}
+
+#diag-actions button.ghost {
+	background: #18242f;
+	color: #cfe0ee;
+}
+
+#fallback-start {
+	display: none;
+	position: fixed;
+	z-index: 45;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	appearance: none;
+	border: 0;
+	border-radius: 12px;
+	padding: 16px 48px;
+	font: 700 22px/1 system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+	letter-spacing: 0.04em;
+	background: #33bf66;
+	color: #06210f;
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+body.fallback-start #fallback-start {
+	display: block;
+}
+
+.compat-button {
+	margin-top: 18px;
+	appearance: none;
+	border: 0;
+	border-radius: 999px;
+	padding: 12px 24px;
+	font-size: 15px;
+	font-weight: 600;
+	font-family: inherit;
+	cursor: pointer;
+	background: #35c46a;
+	color: #06210f;
+}
+
+.compat-card { max-width: 380px; }
+.compat-title { font-size: 21px; font-weight: 700; margin-bottom: 10px; }
+.compat-text { font-size: 15px; line-height: 1.55; opacity: 0.82; }
+.compat-text + .compat-text { margin-top: 10px; direction: rtl; }
+
+#inapp-hint {
+	display: none;
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 25;
+	background: rgba(10, 14, 18, 0.94);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+	color: #fff;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+	font-size: 13px;
+	line-height: 1.4;
+	padding: 10px 44px 10px 14px;
+	text-align: center;
+}
+
+#inapp-hint.show { display: block; }
+
+#inapp-hint button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 40px;
+	height: 100%;
+	background: transparent;
+	border: 0;
+	color: #fff;
+	font-size: 20px;
+	cursor: pointer;
+}
+		</style>
+		<script>
+/* Cap the render resolution on phones. A high-DPR Android device can ask Godot
+   for a drawing buffer larger than the GPU's maximum renderbuffer/texture size,
+   which shows up as a black or frozen canvas. 2x CSS pixels stays crisp and
+   inside mobile GPU limits. */
+(function () {
+	try {
+		var nativeDpr = window.devicePixelRatio || 1;
+		// Phones are fill-rate bound: 2x CSS pixels is more pixels than a 1080p
+		// desktop, which drops low-end devices to a slideshow and makes taps feel
+		// seconds late. 1.5x is still sharp on a phone and roughly doubles FPS.
+		var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+		var cap = touch ? 1.5 : 2;
+		Object.defineProperty(window, 'devicePixelRatio', {
+			configurable: true,
+			get: function () {
+				return Math.min(nativeDpr, cap);
+			},
+		});
+	} catch (err) {
+		/* Some browsers make devicePixelRatio non-configurable; keep the default. */
+	}
+}());
+		</script>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
+		<style>
+/* ---------- Fallback HUD (only shown if the engine's own UI is not drawn) ---------- */
+#hud {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	pointer-events: none;
+}
+
+#hud[hidden] {
+	display: none;
+}
+
+#hud-stage {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 1920px;
+	height: 1080px;
+	transform-origin: 0 0;
+	pointer-events: none;
+	font-family: Arial, 'Segoe UI', Roboto, system-ui, sans-serif;
+}
+
+#hud .hud-panel {
+	position: absolute;
+	background: rgba(0, 0, 0, 0.55);
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+#hud button {
+	appearance: none;
+	border: 2px solid rgba(255, 255, 255, 0.35);
+	color: #fff;
+	font-weight: 700;
+	border-radius: 12px;
+	pointer-events: auto;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+	-webkit-tap-highlight-color: transparent;
+	touch-action: manipulation;
+	font-family: inherit;
+}
+
+#hud-score {
+	left: 30px;
+	top: 24px;
+	width: 360px;
+	height: 100px;
+	border-radius: 14px;
+	border: 2px solid rgba(255, 217, 51, 0.5);
+	box-sizing: border-box;
+}
+
+#hud-score-text {
+	position: absolute;
+	left: 20px;
+	top: 8px;
+	width: 320px;
+	height: 46px;
+	line-height: 46px;
+	font-size: 32px;
+	font-weight: 700;
+	color: #ffd933;
+}
+
+#hud-coins {
+	position: absolute;
+	left: 24px;
+	top: 58px;
+	height: 30px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+#hud-coin-dot {
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	background: #ffd140;
+	border: 2px solid rgba(255, 255, 255, 0.5);
+	box-sizing: border-box;
+}
+
+#hud-coins-text {
+	font-size: 26px;
+	font-weight: 700;
+	color: #fff;
+}
+
+#hud-health {
+	left: 1470px;
+	top: 24px;
+	width: 420px;
+	height: 44px;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	box-sizing: border-box;
+	overflow: hidden;
+}
+
+#hud-health-fill {
+	position: absolute;
+	left: 44px;
+	top: 8px;
+	width: 332px;
+	height: 28px;
+	background: #40d95f;
+}
+
+#hud-health .hud-cap {
+	position: absolute;
+	top: 8px;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	border: 2px solid rgba(255, 255, 255, 0.5);
+	box-sizing: border-box;
+}
+
+#hud-health .hud-cap.green {
+	left: 8px;
+	background: #59e666;
+}
+
+#hud-health .hud-cap.red {
+	right: 8px;
+	background: #ff4d4d;
+}
+
+#hud-pause {
+	position: absolute;
+	left: 1810px;
+	top: 80px;
+	width: 70px;
+	height: 50px;
+	font-size: 22px;
+	background: rgba(51, 51, 82, 0.9);
+}
+
+#hud-start {
+	position: absolute;
+	left: 860px;
+	top: 470px;
+	width: 200px;
+	height: 90px;
+	font-size: 34px;
+	background: #33bf66;
+}
+
+.hud-dim {
+	position: absolute;
+	inset: 0;
+	pointer-events: auto;
+}
+
+#hud-paused {
+	background: rgba(0, 0, 0, 0.55);
+}
+
+#hud-over {
+	background: rgba(0, 0, 0, 0.5);
+}
+
+#hud-question {
+	background: rgba(0, 0, 0, 0.6);
+}
+
+#hud-paused .hud-title {
+	position: absolute;
+	left: 660px;
+	top: 340px;
+	width: 600px;
+	height: 130px;
+	line-height: 130px;
+	text-align: center;
+	font-size: 100px;
+	font-weight: 700;
+	color: #fff;
+}
+
+#hud-resume {
+	position: absolute;
+	left: 810px;
+	top: 540px;
+	width: 300px;
+	height: 90px;
+	font-size: 36px;
+	background: #33cc66;
+}
+
+#hud-over .hud-title {
+	position: absolute;
+	left: 560px;
+	top: 260px;
+	width: 800px;
+	height: 150px;
+	line-height: 150px;
+	text-align: center;
+	font-size: 108px;
+	font-weight: 700;
+	color: #f22626;
+}
+
+#hud-final {
+	position: absolute;
+	left: 660px;
+	top: 440px;
+	width: 600px;
+	height: 70px;
+	line-height: 70px;
+	text-align: center;
+	font-size: 44px;
+	font-weight: 700;
+	color: #fff;
+}
+
+#hud-revive {
+	position: absolute;
+	left: 760px;
+	top: 540px;
+	width: 400px;
+	height: 90px;
+	font-size: 36px;
+	background: #33cc66;
+}
+
+#hud-restart {
+	position: absolute;
+	left: 760px;
+	top: 650px;
+	width: 400px;
+	height: 80px;
+	font-size: 30px;
+	background: #33b3e6;
+}
+
+#hud-question-panel {
+	position: absolute;
+	left: 360px;
+	top: 90px;
+	width: 1200px;
+	height: 900px;
+	box-sizing: border-box;
+	border-radius: 26px;
+	background: rgba(13, 20, 41, 0.96);
+	border: 3px solid rgba(77, 217, 255, 0.8);
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+#hud-q-title {
+	position: absolute;
+	left: 0;
+	top: 34px;
+	width: 1200px;
+	height: 70px;
+	line-height: 70px;
+	text-align: center;
+	font-size: 52px;
+	font-weight: 700;
+	color: #59ebff;
+}
+
+#hud-q-text {
+	position: absolute;
+	left: 70px;
+	top: 140px;
+	width: 1060px;
+	height: 190px;
+	font-size: 30px;
+	color: #fff;
+	text-align: center;
+	direction: rtl;
+	font-family: Tahoma, Arial, sans-serif;
+}
+
+#hud-q-time {
+	position: absolute;
+	left: 0;
+	top: 330px;
+	width: 1200px;
+	height: 56px;
+	line-height: 56px;
+	text-align: center;
+	font-size: 36px;
+	font-weight: 700;
+	color: #ffa633;
+}
+
+.hud-option {
+	position: absolute;
+	left: 120px;
+	width: 960px;
+	height: 92px;
+	font-size: 27px;
+	padding: 0 18px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="index.png" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+			<div id="status-slow" hidden>
+				<span>Still loading?</span>
+				<button id="status-slow-reload" type="button">Reload</button>
+			</div>
+		</div>
+
+		<div id="rotate-hint" role="dialog" aria-label="Rotate your device">
+			<div class="rotate-card">
+				<svg class="rotate-icon" viewBox="0 0 24 24" fill="none" stroke="#35c46a" stroke-width="1.6"
+					stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<rect x="7" y="2.5" width="10" height="19" rx="2"></rect>
+					<line x1="10.5" y1="18.6" x2="13.5" y2="18.6"></line>
+				</svg>
+				<div class="rotate-title">Rotate your device</div>
+				<div class="rotate-sub" lang="ar">أدر جهازك للعب</div>
+				<div class="rotate-note">Khotwa is played in landscape. Turn your phone sideways (or widen this window) for the full experience.</div>
+				<div class="rotate-actions">
+					<button id="rotate-play" type="button">Play in fullscreen</button>
+				</div>
+			</div>
+		</div>
+
+		<div id="compat-hint" role="alert">
+			<div class="compat-card">
+				<div class="compat-title">This browser can't run the game</div>
+				<div class="compat-text">
+					Khotwa needs WebGL 2. Please update to a recent version of Chrome, Safari, Firefox or Edge,
+					and open this link directly in the browser (not inside the Instagram, Facebook or TikTok in-app browser).
+				</div>
+				<div class="compat-text" lang="ar">
+					تحتاج اللعبة إلى WebGL 2. يرجى تحديث المتصفح أو فتح الرابط مباشرة في Safari أو Chrome.
+				</div>
+			</div>
+		</div>
+
+		<div id="fatal-hint" role="alert">
+			<div class="compat-card">
+				<div class="compat-title">The game stopped</div>
+				<div class="compat-text">
+					The graphics were interrupted by the phone or the browser. Reload to continue.
+				</div>
+				<div class="compat-text" lang="ar">
+					توقفت اللعبة بسبب مقاطعة الرسومات. أعد تحميل الصفحة للمتابعة.
+				</div>
+				<button id="fatal-reload" class="compat-button" type="button">Reload</button>
+			</div>
+		</div>
+
+		<div id="inapp-hint">
+			For the best experience, open this link in Safari or Chrome.
+			<button id="inapp-close" type="button" aria-label="Dismiss">&times;</button>
+		</div>
+
+		<button id="fallback-start" type="button">START</button>
+
+		<div id="hud" hidden>
+			<div id="hud-stage">
+				<div id="hud-score" class="hud-panel" hidden>
+					<div id="hud-score-text">SCORE: 0</div>
+					<div id="hud-coins">
+						<span id="hud-coin-dot"></span>
+						<span id="hud-coins-text">x 0</span>
+					</div>
+				</div>
+				<div id="hud-health" class="hud-panel">
+					<span class="hud-cap green"></span>
+					<div id="hud-health-fill"></div>
+					<span class="hud-cap red"></span>
+				</div>
+				<button id="hud-pause" type="button" hidden>II</button>
+				<button id="hud-start" type="button" hidden>START</button>
+				<div id="hud-paused" class="hud-dim" hidden>
+					<div class="hud-title">PAUSED</div>
+					<button id="hud-resume" type="button">RESUME</button>
+				</div>
+				<div id="hud-over" class="hud-dim" hidden>
+					<div class="hud-title">GAME OVER</div>
+					<div id="hud-final">Final Score: 0</div>
+					<button id="hud-revive" type="button">REVIVE</button>
+					<button id="hud-restart" type="button">RESTART</button>
+				</div>
+				<div id="hud-question" class="hud-dim" hidden>
+					<div id="hud-question-panel">
+						<div id="hud-q-title">HEALTH CHECK</div>
+						<div id="hud-q-text" dir="rtl"></div>
+						<div id="hud-q-time">TIME: 15</div>
+						<div id="hud-q-options"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="diag" role="dialog" aria-label="Diagnostics">
+			<h2 id="diag-title">
+				Diagnostic report
+				<span>Tap and hold the text to select it, or use Copy. Send this to the developer.</span>
+			</h2>
+			<pre id="diag-body"></pre>
+			<div id="diag-actions">
+				<button id="diag-copy" type="button">Copy report</button>
+				<button id="diag-share" class="ghost" type="button">Share</button>
+				<button id="diag-reload" class="ghost" type="button">Reload</button>
+				<button id="diag-close" class="ghost" type="button">Close</button>
+			</div>
+		</div>
+
+		<script src="index.js"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":16061308,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+	const statusSlow = document.getElementById('status-slow');
+	const statusSlowReload = document.getElementById('status-slow-reload');
+
+	if (statusSlowReload) {
+		statusSlowReload.addEventListener('click', () => window.location.reload());
+	}
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+		const reload = document.createElement('button');
+		reload.type = 'button';
+		reload.className = 'status-reload';
+		reload.textContent = 'Reload';
+		reload.addEventListener('click', () => window.location.reload());
+		statusNotice.appendChild(reload);
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (window.__khotwaState) {
+			window.__khotwaState.boot = window.__khotwaState.boot || {};
+			window.__khotwaState.boot.failed = true;
+		}
+		if (typeof window.__khotwaOpenDiag === 'function') {
+			window.__khotwaOpenDiag('The game could not start');
+		}
+		if (statusSlow) {
+			statusSlow.hidden = true;
+		}
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const BOOT_RETRY_KEY = 'khotwa_boot_retry';
+
+	// Some iOS WebKit builds occasionally abort the WebAssembly download/compile.
+	// One automatic reload per page load is enough to recover from a transient failure
+	// without ever looping.
+	function shouldRetryBoot() {
+		try {
+			if (sessionStorage.getItem(BOOT_RETRY_KEY) === '1') {
+				return false;
+			}
+			sessionStorage.setItem(BOOT_RETRY_KEY, '1');
+			return true;
+		} catch (err) {
+			return false;
+		}
+	}
+
+	function clearBootRetry() {
+		try {
+			sessionStorage.removeItem(BOOT_RETRY_KEY);
+		} catch (err) {
+			/* Storage can be unavailable in private modes. */
+		}
+	}
+
+	let booted = false;
+	let bootWatchdog = null;
+	let bootRecoveryStarted = false;
+
+	const BOOT_FAILURE_NOTICE =
+		'The game could not be loaded.\nCheck your connection and try again.\n' +
+		'تعذر تحميل اللعبة.\nتحقق من اتصالك وحاول مرة أخرى.';
+
+	// Godot's loader does not reject startGame when the wasm fetch or compile fails,
+	// so recover from the unhandled rejection it produces instead of hanging on black.
+	function recoverFromBootFailure() {
+		if (booted || bootRecoveryStarted) {
+			return;
+		}
+		bootRecoveryStarted = true;
+		if (bootWatchdog !== null) {
+			clearTimeout(bootWatchdog);
+			bootWatchdog = null;
+		}
+		if (shouldRetryBoot()) {
+			window.location.reload();
+			return;
+		}
+		clearBootRetry();
+		displayFailureNotice(BOOT_FAILURE_NOTICE);
+	}
+
+	window.addEventListener('unhandledrejection', (event) => {
+		if (booted) {
+			return;
+		}
+		const reason = event.reason;
+		const message = reason && (reason.message || reason.name || String(reason));
+		if (!/fetch|wasm|webassembly|compile|abort|network|load/i.test(String(message))) {
+			return;
+		}
+		event.preventDefault();
+		recoverFromBootFailure();
+	});
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (window.__khotwaState) {
+		window.__khotwaState.boot = window.__khotwaState.boot || {};
+		window.__khotwaState.boot.missing = Array.isArray(missing) ? missing.slice() : [];
+	}
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		// Godot computes the canvas size and lays out the whole UI (HUD, START
+		// button, health bar) once, when the engine starts. Starting while the
+		// phone is still portrait leaves that UI at portrait geometry; after
+		// rotating or entering fullscreen the world renders but the HUD sits
+		// off-screen, so nothing can be tapped. Wait until the page is really
+		// landscape before booting.
+		let bootStarted = false;
+		let bootPoll = null;
+
+		function isLandscape() {
+			return window.innerWidth > window.innerHeight;
+		}
+
+		function stopBootGate() {
+			window.removeEventListener('resize', startEngine);
+			window.removeEventListener('orientationchange', startEngine);
+			document.removeEventListener('fullscreenchange', startEngine);
+			document.removeEventListener('webkitfullscreenchange', startEngine);
+			try {
+				if (screen.orientation && screen.orientation.removeEventListener) {
+					screen.orientation.removeEventListener('change', startEngine);
+				}
+			} catch (err) {
+				/* Orientation API is optional. */
+			}
+			if (bootPoll !== null) {
+				clearInterval(bootPoll);
+				bootPoll = null;
+			}
+		}
+
+		function startEngine() {
+			if (bootStarted || !isLandscape()) {
+				return;
+			}
+			bootStarted = true;
+			stopBootGate();
+			if (window.__khotwaState) {
+				window.__khotwaState.boot = window.__khotwaState.boot || {};
+				window.__khotwaState.boot.started = performance.now();
+			}
+			setStatusMode('progress');
+			const slowTimer = setTimeout(() => {
+				if (!booted && statusSlow) {
+					statusSlow.hidden = false;
+				}
+			}, 20000);
+			bootWatchdog = setTimeout(recoverFromBootFailure, 90000);
+			engine.startGame({
+				'onProgress': function (current, total) {
+					if (current > 0 && total > 0) {
+						statusProgress.value = current;
+						statusProgress.max = total;
+					} else {
+						statusProgress.removeAttribute('value');
+						statusProgress.removeAttribute('max');
+					}
+				},
+			}).then(() => {
+				booted = true;
+				if (window.__khotwaState) {
+					window.__khotwaState.boot = window.__khotwaState.boot || {};
+					window.__khotwaState.boot.ended = performance.now();
+				}
+				clearTimeout(slowTimer);
+				if (bootWatchdog !== null) {
+					clearTimeout(bootWatchdog);
+					bootWatchdog = null;
+				}
+				clearBootRetry();
+				setStatusMode('hidden');
+				// Nudge the engine once more now that the final landscape size
+				// is known (some Android browsers settle the viewport late).
+				window.dispatchEvent(new Event('resize'));
+			}, (err) => {
+				console.error(err);
+				recoverFromBootFailure();
+			});
+		}
+
+		window.addEventListener('resize', startEngine);
+		window.addEventListener('orientationchange', startEngine);
+		document.addEventListener('fullscreenchange', startEngine);
+		document.addEventListener('webkitfullscreenchange', startEngine);
+		try {
+			if (screen.orientation && screen.orientation.addEventListener) {
+				screen.orientation.addEventListener('change', startEngine);
+			}
+		} catch (err) {
+			/* Orientation API is optional. */
+		}
+		bootPoll = setInterval(startEngine, 300);
+
+		// Nothing else happens while portrait: the rotate overlay is showing.
+		startEngine();
+	}
+}());
+		</script>
+		<script>
+/* Mobile presentation helpers. These only affect the page around the game;
+   the Godot project, scene and gameplay are untouched. */
+(function () {
+	let webgl2 = false;
+	try {
+		const probe = document.createElement('canvas');
+		webgl2 = !!(window.WebGL2RenderingContext && probe.getContext('webgl2'));
+	} catch (err) {
+		webgl2 = false;
+	}
+	if (!webgl2) {
+		document.body.classList.add('no-webgl2');
+	}
+
+	const inAppPattern = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|TikTok|Snapchat|Pinterest/i;
+	if (inAppPattern.test(navigator.userAgent || '')) {
+		const hint = document.getElementById('inapp-hint');
+		if (hint) {
+			hint.classList.add('show');
+			const close = document.getElementById('inapp-close');
+			if (close) {
+				close.addEventListener('click', () => hint.classList.remove('show'));
+			}
+			setTimeout(() => hint.classList.remove('show'), 9000);
+		}
+	}
+
+	function requestFullscreen() {
+		const el = document.documentElement;
+		const request = el.requestFullscreen || el.webkitRequestFullscreen;
+		if (!request) {
+			return Promise.reject(new Error('fullscreen unavailable'));
+		}
+		try {
+			return Promise.resolve(request.call(el));
+		} catch (err) {
+			return Promise.reject(err);
+		}
+	}
+
+	function lockLandscape() {
+		try {
+			if (screen.orientation && typeof screen.orientation.lock === 'function') {
+				return screen.orientation.lock('landscape').catch(() => {});
+			}
+		} catch (err) {
+			/* Orientation lock is best-effort (unsupported on iOS). */
+		}
+		return Promise.resolve();
+	}
+
+	const playButton = document.getElementById('rotate-play');
+	if (playButton) {
+		const canFullscreen = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+		if (!canFullscreen) {
+			// iPhone Safari has no element fullscreen; rotating the phone is the only path.
+			playButton.remove();
+		} else {
+			playButton.addEventListener('click', () => {
+				requestFullscreen().then(lockLandscape).catch(() => {});
+			});
+		}
+	}
+
+	// Stop iOS double-tap zoom and long-press callouts on the canvas.
+	const canvas = document.getElementById('canvas');
+	if (canvas) {
+		canvas.addEventListener('gesturestart', (event) => event.preventDefault());
+		canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+		canvas.addEventListener('webglcontextlost', (event) => {
+			event.preventDefault();
+			document.body.classList.add('graphics-lost');
+		});
+		canvas.addEventListener('webglcontextcreationerror', () => {
+			document.body.classList.add('no-webgl2');
+		});
+	}
+
+	const fatalReload = document.getElementById('fatal-reload');
+	if (fatalReload) {
+		fatalReload.addEventListener('click', () => window.location.reload());
+	}
+}());
+		</script>
+		<script>
+/* Diagnostics panel. This is how a phone that fails tells us what happened:
+   device, GPU limits, viewport metrics, engine state and the exact error log.
+   It opens by itself when the game reports a broken UI, with ?diag=1, or via
+   three quick taps in the top-left corner. */
+(function () {
+	const SHELL_VERSION = '2026-10-27.g';
+	const state = window.__khotwaState || (window.__khotwaState = { startedAt: Date.now(), errors: 0, boot: null, probe: null });
+	const panel = document.getElementById('diag');
+	const body = document.getElementById('diag-body');
+	const title = document.getElementById('diag-title');
+	if (!panel || !body) {
+		return;
+	}
+
+	let reason = '';
+	let isOpen = false;
+	let openedAt = 0;
+
+	function pad(n) {
+		return (n < 10 ? '0' : '') + n;
+	}
+
+	function when(ms) {
+		const d = new Date(ms);
+		return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+			' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+	}
+
+	function seconds(value) {
+		if (value === null || value === undefined) {
+			return 'n/a';
+		}
+		return (value / 1000).toFixed(1) + 's';
+	}
+
+	function gpuInfo() {
+		const info = { ok: false };
+		let gl = null;
+		let temp = null;
+		try {
+			// Only reuse the game's context once Godot has created it: asking for
+			// a context earlier would create one with the wrong attributes.
+			if (state.boot && state.boot.ended) {
+				gl = document.getElementById('canvas').getContext('webgl2');
+			}
+		} catch (err) {
+			gl = null;
+		}
+		if (!gl) {
+			try {
+				temp = document.createElement('canvas');
+				gl = temp.getContext('webgl2');
+			} catch (err) {
+				gl = null;
+			}
+		}
+		if (gl) {
+			try {
+				const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+				info.ok = true;
+				info.lost = gl.isContextLost();
+				info.version = String(gl.getParameter(gl.VERSION) || '');
+				info.renderer = String(gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || '');
+				info.vendor = String(gl.getParameter(dbg ? dbg.UNMASKED_VENDOR_WEBGL : gl.VENDOR) || '');
+				info.maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+				info.maxRenderbuffer = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
+				info.maxViewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+				info.maxUnits = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+			} catch (err) {
+				info.error = String(err);
+			}
+		}
+		if (temp) {
+			try {
+				const lose = gl && gl.getExtension('WEBGL_lose_context');
+				if (lose) {
+					lose.loseContext();
+				}
+			} catch (err) {
+				/* Best effort. */
+			}
+		}
+		return info;
+	}
+
+	function canvasInfo() {
+		const canvas = document.getElementById('canvas');
+		if (!canvas) {
+			return { missing: true };
+		}
+		const rect = canvas.getBoundingClientRect();
+		return {
+			attr: [canvas.width, canvas.height],
+			css: [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height)],
+			client: [canvas.clientWidth, canvas.clientHeight],
+			style: [canvas.style.width, canvas.style.height],
+		};
+	}
+
+	function viewportInfo() {
+		const vv = window.visualViewport;
+		return {
+			inner: [window.innerWidth, window.innerHeight],
+			outer: [window.outerWidth, window.outerHeight],
+			screen: [window.screen.width, window.screen.height],
+			dpr: window.devicePixelRatio,
+			vv: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round(vv.offsetLeft), Math.round(vv.offsetTop), Number(vv.scale.toFixed(2))] : null,
+			orientation: (window.screen.orientation && window.screen.orientation.type) || window.orientation || '',
+			angle: (window.screen.orientation && window.screen.orientation.angle) || 0,
+			displayMode: (window.matchMedia && (window.matchMedia('(display-mode: fullscreen)').matches ? 'fullscreen' :
+				window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser')) || '',
+			fullscreen: !!(document.fullscreenElement || document.webkitFullscreenElement),
+		};
+	}
+
+	function probeLines() {
+		const p = state.probe;
+		if (!p) {
+			return ['(no report from the game engine)'];
+		}
+		const lines = [];
+		const pair = (value) => Array.isArray(value) ? value.join('x') : String(value);
+		lines.push('window: ' + pair(p.window) + ' | screen: ' + pair(p.screen) + ' | viewport: ' + pair(p.viewport));
+		lines.push('content scale: ' + pair(p.content_scale) + ' mode ' + p.content_scale_mode +
+			' aspect ' + p.content_scale_aspect + ' factor ' + p.content_scale_factor);
+		lines.push('stretch: ' + (p.stretch_mode === undefined ? 'n/a' : p.stretch_mode) +
+			' | render: ' + (p.method || '?') + ' / ' + (p.driver || '?'));
+		lines.push('gpu (godot): ' + (p.adapter || '?') + ' / ' + (p.vendor || '?'));
+		lines.push('ui: ' + (p.ui_present ? 'present, ' + p.ui_children + ' controls' : 'MISSING') +
+			' | drawn: ' + (p.ui_drawn === false ? 'NO - HTML HUD active' : 'yes') +
+			' | state: ' + (p.game_state === null || p.game_state === undefined ? '?' : p.game_state) +
+			' | fps: ' + (p.fps === undefined ? 'n/a' : p.fps));
+		const rect = (r) => r ? [r[0], r[1], r[2], r[3]].join(',') : 'n/a';
+		if (p.start) {
+			lines.push('start button: ' + rect(p.start.rect) + ' visible ' + p.start.visible);
+		}
+		if (p.health) {
+			lines.push('health bar: ' + rect(p.health.rect) + ' visible ' + p.health.visible);
+		}
+		if (p.pause) {
+			lines.push('pause button: ' + rect(p.pause.rect) + ' visible ' + p.pause.visible);
+		}
+		return lines;
+	}
+
+	function logLines(limit) {
+		const log = window.__khotwaLog || [];
+		const slice = log.slice(-limit);
+		if (slice.length === 0) {
+			return ['(empty)'];
+		}
+		return slice.map((entry) => '+' + seconds(entry.t) + ' [' + entry.kind + '] ' + entry.text);
+	}
+
+	function buildReport() {
+		const v = viewportInfo();
+		const gpu = gpuInfo();
+		const canvas = canvasInfo();
+		const boot = state.boot || {};
+		const missing = (boot.missing && boot.missing.length) ? boot.missing.join('; ') : 'none';
+		const log = window.__khotwaLog || [];
+		const lines = [];
+		lines.push('KHOTWA DIAGNOSTIC  shell ' + SHELL_VERSION);
+		lines.push('when: ' + when(Date.now()) + '  uptime: ' + seconds(performance.now()));
+		lines.push('url: ' + location.href);
+		if (reason) {
+			lines.push('REASON: ' + reason);
+		}
+		lines.push('errors captured: ' + (state.errors || 0));
+		lines.push('start fallback button: ' + (state.startBroken ? 'was shown' : 'not needed'));
+		const stillLoading = !(state.boot && state.boot.ended) && !(state.boot && state.boot.failed);
+		lines.push('status: ' + (stillLoading
+			? 'STILL LOADING - wait for the game to appear, then copy this report'
+			: 'game loaded'));
+		lines.push('');
+		lines.push('--- device ---');
+		lines.push('ua: ' + navigator.userAgent);
+		lines.push('platform: ' + (navigator.platform || '?') + ' | cores: ' + (navigator.hardwareConcurrency || '?') +
+			' | memory: ' + (navigator.deviceMemory || '?'));
+		lines.push('screen: ' + v.screen.join('x') + ' | inner: ' + v.inner.join('x') +
+			' | outer: ' + v.outer.join('x') + ' | dpr: ' + v.dpr);
+		lines.push('visual viewport: ' + (v.vv ? v.vv.join(' / ') : 'n/a'));
+		lines.push('orientation: ' + v.orientation + ' ' + v.angle + 'deg | display: ' + v.displayMode +
+			' | fullscreen: ' + v.fullscreen);
+		lines.push('');
+		lines.push('--- graphics ---');
+		lines.push('webgl2: ' + (gpu.ok ? 'yes' : 'NO'));
+		if (gpu.ok) {
+			lines.push('renderer: ' + gpu.renderer);
+			lines.push('vendor: ' + gpu.vendor + ' | gl: ' + gpu.version + ' | lost: ' + gpu.lost);
+			lines.push('limits: texture ' + gpu.maxTexture + ' | renderbuffer ' + gpu.maxRenderbuffer +
+				' | units ' + gpu.maxUnits);
+		} else if (gpu.error) {
+			lines.push('error: ' + gpu.error);
+		}
+		lines.push('');
+		lines.push('--- canvas ---');
+		if (canvas.missing) {
+			lines.push('canvas element missing');
+		} else {
+			lines.push('attr: ' + canvas.attr.join('x') + ' | css: ' + canvas.css.join(',') +
+				' | client: ' + canvas.client.join('x') + ' | style: ' + canvas.style.join(' , '));
+		}
+		lines.push('');
+		lines.push('--- engine ---');
+		lines.push('boot: ' + (boot.started ? 'started at ' + seconds(boot.started) : 'NOT started') +
+			' | ended: ' + (boot.ended ? seconds(boot.ended) : 'not yet') +
+			' | failed: ' + (boot.failed ? 'yes' : 'no'));
+		lines.push('missing features: ' + missing);
+		lines.push('');
+		lines.push('--- game (from the engine) ---');
+		lines.push.apply(lines, probeLines());
+		lines.push('');
+		lines.push('--- log (last 30 of ' + log.length + ') ---');
+		lines.push.apply(lines, logLines(30));
+		return lines.join('\n');
+	}
+
+	function refresh() {
+		if (isOpen) {
+			const top = body.scrollTop;
+			body.textContent = buildReport();
+			body.scrollTop = top;
+		}
+	}
+
+	function open(nextReason) {
+		if (nextReason) {
+			reason = nextReason;
+		}
+		isOpen = true;
+		openedAt = Date.now();
+		document.body.classList.add('diag-open');
+		body.textContent = buildReport();
+	}
+
+	function close() {
+		isOpen = false;
+		document.body.classList.remove('diag-open');
+	}
+
+	window.__khotwaOpenDiag = open;
+	window.__khotwaOnLog = refresh;
+
+	window.__khotwaProbe = function (payload) {
+		try {
+			state.probe = Object.assign({}, state.probe || {}, payload);
+			if (payload && payload.boot_seconds) {
+				state.boot = state.boot || {};
+				state.boot.seconds = payload.boot_seconds;
+			}
+			refresh();
+			checkProbe();
+		} catch (err) {
+			/* Telemetry must never break the game. */
+		}
+	};
+
+	function checkProbe() {
+		const p = state.probe;
+		if (!p) {
+			return;
+		}
+		const problems = [];
+		if (p.ui_present === false) {
+			problems.push('the game UI was never created');
+		}
+		const inMenu = p.game_state === null || p.game_state === undefined || p.game_state === 0;
+		let brokenStart = false;
+		if (inMenu && !p.start) {
+			brokenStart = true;
+		}
+		if (inMenu && p.start) {
+			if (!p.start.visible) {
+				brokenStart = true;
+			}
+			if (p.start.rect) {
+				const [x, y, w, h] = p.start.rect;
+				// UI coordinates live in the stretch content space (1920x1080),
+				// so that is the box a control has to be inside to be visible.
+				const vw = (p.content_scale && p.content_scale[0]) || (p.viewport && p.viewport[0]) || 0;
+				const vh = (p.content_scale && p.content_scale[1]) || (p.viewport && p.viewport[1]) || 0;
+				if (w <= 0 || h <= 0 || x + w <= 0 || y + h <= 0 || x >= vw || y >= vh) {
+					brokenStart = true;
+				}
+			}
+		}
+		// In-game the fallback button is pointless; keep it only for the menu.
+		setFallback(inMenu && !state.hudActive && (p.ui_present === false || brokenStart));
+		if (brokenStart) {
+			state.startBroken = true;
+		}
+		if (problems.length && !isOpen) {
+			open('Automatic check: ' + problems.join('; '));
+		}
+	}
+
+	function setFallback(show) {
+		document.body.classList.toggle('fallback-start', !!show);
+	}
+
+	function tapCanvas() {
+		const canvas = document.getElementById('canvas');
+		if (!canvas) {
+			return;
+		}
+		const rect = canvas.getBoundingClientRect();
+		const point = {
+			bubbles: true,
+			cancelable: true,
+			clientX: rect.left + rect.width / 2,
+			clientY: rect.top + rect.height / 2,
+			pointerId: 1,
+			pointerType: 'touch',
+			isPrimary: true,
+			button: 0,
+			buttons: 1,
+		};
+		try {
+			canvas.dispatchEvent(new PointerEvent('pointerdown', point));
+			point.buttons = 0;
+			canvas.dispatchEvent(new PointerEvent('pointerup', point));
+		} catch (err) {
+			/* Synthetic taps are best effort. */
+		}
+	}
+
+	const fallbackStart = document.getElementById('fallback-start');
+	if (fallbackStart) {
+		fallbackStart.addEventListener('click', () => {
+			setFallback(false);
+			if (typeof window.__khotwaStart === 'function') {
+				try {
+					window.__khotwaStart();
+					return;
+				} catch (err) {
+					/* Fall through to a synthetic tap. */
+				}
+			}
+			tapCanvas();
+		});
+	}
+
+	document.getElementById('diag-copy').addEventListener('click', () => {
+		const text = buildReport();
+		const done = () => {
+			const button = document.getElementById('diag-copy');
+			button.textContent = 'Copied';
+			setTimeout(() => { button.textContent = 'Copy report'; }, 1600);
+		};
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(text).then(done, () => selectAll());
+		} else {
+			selectAll();
+		}
+	});
+
+	function selectAll() {
+		try {
+			const range = document.createRange();
+			range.selectNodeContents(body);
+			const selection = window.getSelection();
+			selection.removeAllRanges();
+			selection.addRange(range);
+		} catch (err) {
+			/* Selection is best effort. */
+		}
+	}
+
+	document.getElementById('diag-share').addEventListener('click', () => {
+		const text = buildReport();
+		if (navigator.share) {
+			navigator.share({ title: 'Khotwa diagnostic', text: text }).catch(() => {});
+		} else {
+			selectAll();
+		}
+	});
+
+	document.getElementById('diag-reload').addEventListener('click', () => window.location.reload());
+	document.getElementById('diag-close').addEventListener('click', close);
+
+	// Three quick taps in the top-left corner open the report on any screen.
+	let taps = 0;
+	let firstTap = 0;
+	document.addEventListener('pointerdown', (event) => {
+		if (event.clientX > 110 || event.clientY > 110) {
+			taps = 0;
+			return;
+		}
+		const now = Date.now();
+		if (taps === 0 || now - firstTap > 1500) {
+			taps = 1;
+			firstTap = now;
+			return;
+		}
+		taps += 1;
+		if (taps >= 3) {
+			taps = 0;
+			open(reason || 'opened manually');
+		}
+	}, true);
+
+	if (/[?&]diag=1/.test(location.search) || location.hash === '#diag') {
+		open('opened manually with ?diag=1');
+	}
+
+	// Keep the report current while it is on screen (boot progress, new errors).
+	setInterval(() => {
+		if (isOpen && Date.now() - openedAt < 180000) {
+			refresh();
+		}
+		if (!isOpen && !state.probe && state.boot && state.boot.ended &&
+			performance.now() - state.boot.ended > 12000) {
+			open('The game engine did not send a layout report');
+		}
+	}, 1000);
+
+	// Desktop start: Tab or Enter starts the run, and Tab never moves focus
+	// off the canvas.
+	window.addEventListener('keydown', (event) => {
+		if (event.key !== 'Tab' && event.key !== 'Enter') {
+			return;
+		}
+		if (event.key === 'Tab') {
+			event.preventDefault();
+		}
+		if (typeof window.__khotwaStart === 'function') {
+			try {
+				window.__khotwaStart();
+			} catch (err) {
+				/* Starting is best effort. */
+			}
+		}
+	}, true);
+}());
+		</script>
+		<script>
+/* Fallback HUD. It is hidden unless the engine reports that its own UI layer
+   draws nothing (see web_support.gd). Everything it shows comes from the real
+   game state, and every button calls back into the real game manager. */
+(function () {
+	const hud = document.getElementById('hud');
+	if (!hud) {
+		return;
+	}
+	const stage = document.getElementById('hud-stage');
+	const score = document.getElementById('hud-score');
+	const scoreText = document.getElementById('hud-score-text');
+	const coinsText = document.getElementById('hud-coins-text');
+	const pauseBtn = document.getElementById('hud-pause');
+	const startBtn = document.getElementById('hud-start');
+	const paused = document.getElementById('hud-paused');
+	const over = document.getElementById('hud-over');
+	const finalText = document.getElementById('hud-final');
+	const question = document.getElementById('hud-question');
+	const qText = document.getElementById('hud-q-text');
+	const qTime = document.getElementById('hud-q-time');
+	const qOptions = document.getElementById('hud-q-options');
+	const healthFill = document.getElementById('hud-health-fill');
+	let optionKey = '';
+
+	function layout() {
+		const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+		const x = (window.innerWidth - 1920 * s) / 2;
+		const y = (window.innerHeight - 1080 * s) / 2;
+		stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
+	}
+	layout();
+	window.addEventListener('resize', layout);
+	window.addEventListener('orientationchange', layout);
+
+	function act(action, value) {
+		try {
+			if (typeof window.__khotwaAction === 'function') {
+				window.__khotwaAction(action, value === undefined ? 0 : value);
+			}
+		} catch (err) {
+			/* The game may not be ready yet; ignore. */
+		}
+	}
+
+	startBtn.addEventListener('click', () => act('start'));
+	pauseBtn.addEventListener('click', () => act('pause'));
+	document.getElementById('hud-resume').addEventListener('click', () => act('resume'));
+	document.getElementById('hud-revive').addEventListener('click', () => act('revive'));
+	document.getElementById('hud-restart').addEventListener('click', () => act('restart'));
+
+	function show(el, on) {
+		if (el) {
+			el.hidden = !on;
+		}
+	}
+
+	function fmt(n) {
+		return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+	}
+
+	function renderOptions(options) {
+		const key = JSON.stringify(options);
+		if (key === optionKey) {
+			return;
+		}
+		optionKey = key;
+		qOptions.textContent = '';
+		const colors = ['#33b871', '#388ce6', '#f39e33', '#ad5ceb'];
+		const letters = ['أ', 'ب', 'ج', 'د'];
+		options.slice(0, 4).forEach((text, i) => {
+			const button = document.createElement('button');
+			button.type = 'button';
+			button.className = 'hud-option';
+			button.style.top = (400 + i * 108) + 'px';
+			button.style.background = colors[i];
+			button.dir = 'rtl';
+			button.textContent = letters[i] + ') ' + text;
+			button.addEventListener('click', () => act('answer', i));
+			qOptions.appendChild(button);
+		});
+	}
+
+	window.__khotwaHud = function (data) {
+		if (!data) {
+			return;
+		}
+		hud.hidden = false;
+		window.__khotwaState = window.__khotwaState || {};
+		window.__khotwaState.hudActive = true;
+		layout();
+		const state = data.state;
+		show(score, state === 1 || state === 4);
+		show(pauseBtn, state === 1);
+		show(startBtn, state === 0);
+		show(paused, state === 2 && !data.question);
+		show(over, state === 4 && !data.question);
+		show(question, !!data.question);
+		scoreText.textContent = 'SCORE: ' + fmt(data.score || 0);
+		coinsText.textContent = 'x ' + fmt(data.coins || 0);
+		finalText.textContent = 'Final Score: ' + fmt(data.score || 0);
+		const max = Math.max(1, data.max_health || 100);
+		const ratio = Math.max(0, Math.min(1, (data.health || 0) / max));
+		healthFill.style.width = (332 * ratio) + 'px';
+		healthFill.style.background = ratio > 0.5 ? '#40d95f' : (ratio > 0.25 ? '#f2cc33' : '#e63333');
+		if (data.question) {
+			qText.textContent = data.question_text || '';
+			qTime.textContent = 'TIME: ' + (data.time === undefined ? 15 : data.time);
+			renderOptions(data.options || []);
+		} else {
+			optionKey = '';
+		}
+	};
+}());
+		</script>
+	</body>
+</html>
+
