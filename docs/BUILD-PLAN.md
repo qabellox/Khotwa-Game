@@ -147,18 +147,99 @@ here is a rewrite later. Each is one page.
 8. Monetisation - if any (rewarded ads only, or IAP, or neither) and consent
 9. Analytics and crash reporting (events worth collecting, privacy constraints)
 
-## 7. Scope correction
+## 6a. The art pipeline: author in 3D, ship in 2D
 
-Your list included "authentication, logging and pricing and purchasing". For a Play Store game:
+The single biggest quality lever for a premium look, and the answer to art consistency across
+hundreds of assets.
 
-- **No login is needed.** A single-player runner needs no account. Adding one adds a backend, a
-  privacy surface and a support burden for zero gameplay value.
-- **No custom pricing or purchasing stack.** Google Play Billing handles price, tax, currency and
-  receipts. The work is a thin client plus server-side or local receipt validation.
-- **Analytics is not "logging".** It is a small, deliberate event set.
+**How it actually works.** An LLM does not render anything. It writes a script; a renderer
+executes it. The loop is:
 
-If you actually want a web store, accounts and a purchase funnel, that is a second product with
-its own backend, and it is the largest scope risk in the list. Decide explicitly, not by drift.
+1. The model writes a **Blender Python (`bpy`) script** that builds or poses a rig.
+2. Headless Blender renders frames: N angles x M animation frames x fixed lighting.
+3. A Python/Pillow step trims, packs into an atlas, writes a manifest, and emits the Godot
+   `.tres`/sprite metadata.
+4. The model **looks at the rendered PNG** (vision) and revises the script.
+5. Repeat until the batch passes a palette and silhouette check.
+
+Steps 1-3 are deterministic and repeatable. Step 4 is what closes the loop and is the part that
+needs a vision-capable model.
+
+**Why this beats hand-drawn asset generation for this game.**
+
+| Property | Hand/AI-drawn per asset | 3D bake to 2D |
+| --- | --- | --- |
+| Palette consistency | Drifts across assets | Locked by materials |
+| Lighting direction | Must be redrawn each time | Comes from the light rig |
+| Animation frames | Each drawn separately | Rendered from one timeline |
+| Cost per new skin | Full redraw | Swap material, re-bake |
+| Silhouette readability | Judged per image | Judged once on the rig |
+
+That last row is the premium tell: a shop with 30 skins costs one model plus 30 material variants,
+not 30 character sheets.
+
+**Environment status (checked).** Blender is **not installed** on this machine. Python 3.14,
+Pillow 12.3 and numpy 2.5 are present. Enabling this pipeline needs one free Blender install
+(~350 MB); nothing else.
+
+**Budget.** A 2D bake pipeline is roughly 20-40 hours of build plus ~10 hours per biome batch.
+It pays for itself the moment you need more than about 40 assets or more than one skin set.
+
+## 6b. Audience fork: "for kids" vs "for teens"
+
+This is a compliance decision with a revenue consequence, not a marketing choice.
+
+| | Declared 13+ (teens and up) | Declared for children (under 13) |
+| --- | --- | --- |
+| Google Play Families policy | Not applicable | **Applies in full** |
+| Personalised ads | Allowed with consent | **Prohibited** |
+| Analytics on users | Allowed with disclosure and consent | **Heavily restricted** |
+| COPPA (US) | Not applicable | Parental consent required |
+| Ad networks | Any certified network | Only Play-certified families SDKs |
+| Revenue ceiling | Normal | Substantially lower |
+
+Children's apps are also held to stricter content, data and ad rules, and violations lead to
+removal rather than a warning. If the goal is a data-informed free-to-play economy, the app must
+be declared **13+**, and the marketing and art must not signal "for young children" - otherwise it
+gets reclassified during review.
+
+Required either way: privacy policy URL, Play data safety form, IARC content rating, and a consent
+flow (Google UMP) before any personalised ad or analytics identifier is used.
+
+## 7. Scope: the economy
+
+The target is a free-to-play economy, not a single-player demo. That is a real product with real
+systems, so here is the honest line-item view.
+
+| System | Needed for | Build cost | Running cost |
+| --- | --- | --- | --- |
+| Soft currency (coins) earned in runs | Retention | Included in M2 | $0 |
+| Premium currency purchased | Revenue | Included in M3 | Play's 15/30% cut |
+| Shop with cosmetic skins | Revenue | M3, ~30-60 h | $0 |
+| Rewarded ads (extra life, coin boost) | Revenue without paywalls | M3, ~20-30 h | $0, ad network pays |
+| IAP: currency packs and skin bundles | Revenue | M6, ~30-50 h | Play cut |
+| Receipt validation | Fraud prevention | M6, ~15-25 h | $0-$20/mo |
+| Analytics events | Product decisions | M3, ~10-20 h | $0 at small scale |
+| Crash reporting | Quality | M3, ~5 h | $0 |
+| Consent flow (UMP) + T&C acceptance | Legal requirement | M7, ~10-20 h | $0 |
+| Cloud save / restore purchases | Player trust | M6, ~20-30 h | $0-$10/mo |
+
+**Identity without a login screen.** A cross-device economy needs *an* identity, but not a
+password. Google Play Games Services sign-in gives a stable player ID, achievement hooks and
+cloud save, with no email collection and no password database to leak. Email/password login is
+the option that adds a backend, a breach liability and a support queue - avoid it unless there is
+a web store.
+
+**Currency can never be cashed out.** Selling a soft currency that players can convert back to
+money, or trading skins between players, turns this into a regulated payments and gambling
+surface. Keep purchases one-way: money in, cosmetics out.
+
+**What Google handles for you.** Play Billing sets price per country, collects tax, converts
+currency and issues receipts. You do not build a checkout, and you should not try.
+
+**The one thing to decide now:** whether ads are in the economy at all. Rewarded-only ads are
+defensible for an awareness game about addiction; interstitial ads after every run are not, and
+they will read as hypocritical to the audience and to reviewers.
 
 ## 8. What free models are genuinely bad at here
 
@@ -196,6 +277,8 @@ Not vibes. All of these, per milestone:
 | Play Billing integration | Weeks lost, money-path bugs | Frontier model, official plugin only, test with licence testers |
 | Perf on low-end devices | Bad reviews | Low-end device in hand from M1, not M6 |
 | Scope creep from web-store ideas | Doubles the project | Decide section 7 explicitly before M0 |
+| Declared "for kids" by mistake | Removal risk, ads and analytics lost | Declare 13+, art and store listing must not signal under-13 (section 6b) |
+| Economy imbalance or exploit | Revenue loss, player anger | Precious-currency tables written before M3, simulated before M6 |
 | Content thinness (10 questions) | Low retention | 40+ questions by M4, written as data not code |
 
 ## 11. Recommendation
@@ -205,3 +288,9 @@ Run **Path B**. Start with M0 and M1 only. M0 is a few frontier sessions ($20-$4
 a real phone, and a visual answer to "does this look like a store game".
 
 Everything after M1 is priced against that measurement instead of against my guess.
+
+**Revised band with the premium economy included** (shop, skins, ads, IAP, analytics, consent,
+cloud save): roughly **400-550 hours** and **$3k-$7k cash**, of which **$1.2k-$2.5k is models** on
+Path B. The economy adds ~120-180 hours over the no-economy plan and roughly $0-$30/month to run at
+small scale. It also means the project does not end at launch: a live economy needs balance
+tuning and content drops.
