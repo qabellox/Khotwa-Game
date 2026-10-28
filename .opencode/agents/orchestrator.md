@@ -1,7 +1,7 @@
 ---
 description: "Coordinator: plans work, decomposes it, delegates to thinker/asset-pipeline/builder/tester, verifies results, and reports. Never edits or runs commands itself."
 mode: all
-model: "opencode/glm-5.3-flash-free#max"
+model: "opencode/deepseek-v4.1-flash-free#high"
 color: "#4db8ff"
 steps: 80
 permissions:

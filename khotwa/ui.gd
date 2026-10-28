@@ -49,6 +49,17 @@ var _flash: ColorRect
 var _question_time_left: = 0.0
 var _flash_tween: Tween
 
+// Start screen assets (loaded in _load_assets)
+var _start_bg_texture: Texture2D
+var _runner_texture: Texture2D
+var _start_btn_texture: Texture2D
+
+// Start screen nodes
+var _start_bg: Sprite2D
+var _runner_sprite: Sprite2D
+var _start_btn_sprite: Sprite2D
+var _start_btn_hit_area: Area2D
+
 @onready var game_manager: GameManager = get_node("../GameManager")
 
 
@@ -59,6 +70,7 @@ func _ready() -> void :
 	_build_game_over()
 	_build_question_popup()
 	_build_flash()
+	_build_start_screen()
 	game_manager.score_changed.connect(_on_score_changed)
 	game_manager.health_changed.connect(_on_health_changed)
 	game_manager.coins_changed.connect(_on_coins_changed)
@@ -71,6 +83,10 @@ func _load_assets() -> void :
 	_ui_font = load(ARIAL) as Font
 	_ui_bold = load(ARIAL_BOLD) as Font
 	_arabic = load(TAHOMA) as Font
+	
+	_start_bg_texture = load("res://assets/generated/backgrounds/start-background.jpg") as Texture2D
+	_runner_texture = load("res://assets/generated/sprites/runner-float.jpg") as Texture2D
+	_start_btn_texture = load("res://assets/generated/ui/start-button.jpg") as Texture2D
 
 
 func _process(delta: float) -> void :
@@ -87,13 +103,19 @@ func _process(delta: float) -> void :
 func _refresh() -> void :
 	match game_manager.state:
 		GameManager.GameState.MENU:
-			_start_button.visible = true
+			_start_bg.visible = true
+			_runner_sprite.visible = true
+			_start_btn_sprite.visible = true
+			_start_btn_hit_area.visible = true
 			_score_panel.visible = false
 			_pause_button.visible = false
 			_pause_overlay.visible = false
 			_game_over_overlay.visible = false
 		GameManager.GameState.RUNNING:
-			_start_button.visible = false
+			_start_bg.visible = false
+			_runner_sprite.visible = false
+			_start_btn_sprite.visible = false
+			_start_btn_hit_area.visible = false
 			_score_panel.visible = true
 			_pause_button.visible = true
 			_pause_overlay.visible = false
@@ -105,7 +127,10 @@ func _refresh() -> void :
 			_pause_overlay.visible = true
 			_game_over_overlay.visible = false
 		GameManager.GameState.GAME_OVER:
-			_start_button.visible = false
+			_start_bg.visible = false
+			_runner_sprite.visible = false
+			_start_btn_sprite.visible = false
+			_start_btn_hit_area.visible = false
 			_score_panel.visible = true
 			_pause_button.visible = false
 			_pause_overlay.visible = false
@@ -153,10 +178,7 @@ func _build_hud() -> void :
 	add_child(_pause_button)
 
 
-	_start_button = _make_button("START", Vector2(860, 470), Vector2(200, 90), Color(0.2, 0.75, 0.4), 34, _ui_bold)
-	_start_button.pressed.connect(_on_start_pressed)
-	add_child(_start_button)
-	_start_button.visible = false
+	
 
 
 func _build_pause_overlay() -> void :
@@ -237,8 +259,73 @@ func _build_flash() -> void :
 	add_child(_flash)
 
 
+func _build_start_screen() -> void :
+	// Background sprite (full screen)
+	_start_bg = Sprite2D.new()
+	_start_bg.texture = _start_bg_texture
+	_start_bg.position = Vector2.ZERO
+	_start_bg.size = Vector2(VIEW_W, VIEW_H)
+	add_child(_start_bg)
+	
+	// Runner sprite - floats gently up and down
+	_runner_sprite = Sprite2D.new()
+	_runner_sprite.texture = _runner_texture
+	_runner_sprite.position = Vector2(960, 500)
+	_runner_sprite.scale = Vector2(2.0, 2.0)
+	add_child(_runner_sprite)
+	
+	// Float animation: up-down loop
+	var tween_runner = create_tween()
+	tween_runner.tween_property(_runner_sprite, "position:y", 450, 2.0)
+	tween_runner.set_loops(-1)
+	tween_runner.yoyo = true
+	
+	// Start button sprite
+	_start_btn_sprite = Sprite2D.new()
+	_start_btn_sprite.texture = _start_btn_texture
+	_start_btn_sprite.position = Vector2(860, 470)
+	_start_btn_sprite.scale = Vector2(2.0, 2.0)
+	add_child(_start_btn_sprite)
+	
+	// Pulsing animation on the button
+	var tween_btn = create_tween()
+	tween_btn.tween_property(_start_btn_sprite, "scale", Vector2(2.3, 2.3), 1.5)
+	tween_btn.set_loops(-1)
+	tween_btn.yoyo = true
+	
+	// Hit area for the button (invisible, covers the button)
+	_start_btn_hit_area = Area2D.new()
+	_start_btn_hit_area.position = Vector2(860 - 100, 470 - 45)
+	_start_btn_hit_area.size = Vector2(400, 180)
+	add_child(_start_btn_hit_area)
+	
+	_start_btn_hit_area.input_event.connect(_on_start_btn_pressed)
+	
+	// Initial tweens - start them after a brief delay
+	await get_tree().create_timer(0.5).timeout
+	tween_runner.start()
+	tween_btn.start()
 
 
+func _on_start_btn_pressed(event: InputEvent) -> void :
+	if event is InputEventMouseButton:
+		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_start_btn_hit_area.visible = false
+			_transition_to_game()
+
+
+func _transition_to_game() -> void :
+	// Fade out start screen elements
+	if _start_bg != null:
+		_start_bg.visible = false
+	if _runner_sprite != null:
+		_runner_sprite.visible = false
+	if _start_btn_sprite != null:
+		_start_btn_sprite.visible = false
+	
+	// Wait then start the game
+	await get_tree().create_timer(0.5).timeout
+	game_manager.start_game()
 
 
 func _styled_panel(rect: Rect2, bg: Color, radius: float, border: Color, border_w: float) -> Panel:

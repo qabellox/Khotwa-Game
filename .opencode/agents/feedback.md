@@ -1,7 +1,7 @@
 ---
 description: "User-facing intake agent: turns a natural-language request into a precise brief and routes it to the orchestrator. Does no planning, editing, or building."
 mode: primary
-model: "opencode/flint-40b-free#high"
+model: "opencode/deepseek-v4.1-flash-free#high"
 color: "#f2b84b"
 steps: 30
 permissions:

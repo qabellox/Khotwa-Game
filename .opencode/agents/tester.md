@@ -1,7 +1,7 @@
 ---
 description: "Runs the game and the browser, captures console errors, screenshots, network failures, and performance evidence. Reports only; never fixes code."
 mode: subagent
-model: "opencode/mimo-v2.6-flash-free"
+model: "opencode/deepseek-v4.1-flash-free#high"
 color: "#ff5f7e"
 steps: 60
 permissions:

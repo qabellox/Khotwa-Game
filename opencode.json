@@ -57,6 +57,38 @@
           "startup": 60000,
           "catalog": 60000
         }
+      },
+      "spritehatch-mcp": {
+        "type": "local",
+        "command": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Users/Qebaa/AppData/Roaming/npm/node_modules/@spritehatch/mcp/cli.js"
+        ],
+        "environment": {
+          "SPRITEHATCH_API_KEY": "PLACEHOLDER_SPRITEHATCH_KEY_MUST_FILL"
+        },
+        "codemode": false,
+        "timeout": {
+          "startup": 30000,
+          "catalog": 30000,
+          "execution": 600000
+        }
+      },
+      "chutes-media-mcp": {
+        "type": "local",
+        "command": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Users/Qebaa/AppData/Roaming/npm/node_modules/chutes-media-mcp/cli.js"
+        ],
+        "environment": {
+          "CHUTES_API_KEY": "PLACEHOLDER_CHUTES_KEY_MUST_FILL"
+        },
+        "codemode": false,
+        "timeout": {
+          "startup": 30000,
+          "catalog": 30000,
+          "execution": 600000
+        }
       }
     }
   }

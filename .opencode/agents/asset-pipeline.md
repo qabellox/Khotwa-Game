@@ -1,7 +1,7 @@
 ---
 description: "Generates 2D sprites, backgrounds, and UI icons through the AssetForge MCP, inspects the results, and returns file paths. Never writes game logic."
 mode: subagent
-model: "opencode/nemotron-3.5-super-vl-free#high"
+model: "opencode/deepseek-v4.1-flash-free#high"
 color: "#5fd38d"
 steps: 40
 permissions:

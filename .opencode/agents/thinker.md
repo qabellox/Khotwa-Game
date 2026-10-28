@@ -1,7 +1,7 @@
 ---
 description: "Analyzes problems, finds root causes, and produces exact fix plans with file references. Read-only: never edits or runs commands."
 mode: subagent
-model: "opencode/glm-5.3-flash-free#max"
+model: "opencode/deepseek-v4.1-flash-free#high"
 color: "#9b7bff"
 steps: 40
 permissions:
