@@ -1,23 +1,35 @@
 # Khotwa
 
-Khotwa (Break Free) is a 2D endless runner built in Godot 4.7.
+Khotwa (خطوة, "a step") is a 2D endless runner built in **Godot 4.7.2**: an Arabic
+anti-drug and addiction-awareness game exported for the web.
 
 ## Play
 
 **https://khotwa-preview.vercel.app/**
 
 This is the only hosted copy. It serves the public web export, so it is playable from any
-phone, tablet or desktop browser — no local install needed. The game runs landscape only and
+phone, tablet or desktop browser - no local install needed. The game runs landscape only and
 asks you to rotate.
+
+You run through three lanes, dodge drugs and junk food, collect coins, fruit and healthy
+items, and revive after death only by answering an Arabic awareness question correctly
+within 15 seconds.
+
+## Project context
+
+- `docs/PROJECT.md` - what the game is, how it plays, architecture, costs and the agent team.
+- `.opencode/skills/khotwa-game/SKILL.md` - the same context for AI agents.
+- `.opencode/agents/` - the agent definitions (`feedback`, `orchestrator`, `thinker`,
+  `asset-pipeline`, `builder`, `tester`).
 
 ## Open the project
 
-Open the `khotwa` folder in **Godot 4.7** and run the main scene. The game is
-authored at 1920×1080 and letterboxed, so any screen size works.
+Open the `khotwa` folder in **Godot 4.7** and run the main scene. The game is authored at
+1920x1080 and letterboxed, so any screen size works.
 
 ## Build the web version
 
-The web build is produced only through Godot's export pipeline — never edit `dist/web` by hand.
+The web build is produced only through Godot's export pipeline - never edit `dist/web` by hand.
 
 ```powershell
 godot --headless --path khotwa --export-release "Web" ..\dist\web\index.html
@@ -47,4 +59,3 @@ Notes:
 - A build takes about 30 seconds. Progress: https://github.com/qabellox/Khotwa-Game/actions
 - To rebuild without changing code, run the workflow manually from the Actions tab.
 - Manual deploy from `dist/web` still works for emergencies: `vercel deploy --prod`.
-

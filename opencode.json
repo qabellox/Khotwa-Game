@@ -1,0 +1,63 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "feedback",
+  "experimental": {
+    "todo": true,
+    "subagent_depth": 2
+  },
+  "mcp": {
+    "servers": {
+      "assetforge": {
+        "type": "local",
+        "command": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Users/Qebaa/Projects/Khotwa-Game/.opencode/mcp/asset-forge/server.mjs"
+        ],
+        "environment": {
+          "ASSET_FORGE_OUTPUT": "C:/Users/Qebaa/Projects/Khotwa-Game/khotwa/assets/generated"
+        },
+        "codemode": false,
+        "timeout": {
+          "startup": 30000,
+          "catalog": 30000,
+          "execution": 600000
+        }
+      },
+      "memory": {
+        "type": "local",
+        "command": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Users/Qebaa/Projects/Khotwa-Game/.opencode/mcp/memory/server.mjs"
+        ],
+        "environment": {
+          "MEMORY_DB": "C:/Users/Qebaa/Projects/Khotwa-Game/.opencode/memory/store.json"
+        },
+        "codemode": false,
+        "timeout": {
+          "startup": 30000,
+          "catalog": 30000
+        }
+      },
+      "playwright": {
+        "type": "local",
+        "command": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Users/Qebaa/AppData/Roaming/npm/node_modules/@playwright/mcp/cli.js",
+          "--browser",
+          "chrome",
+          "--headless",
+          "--isolated",
+          "--console-level",
+          "warning",
+          "--output-dir",
+          "C:/Users/Qebaa/Projects/Khotwa-Game/_shots"
+        ],
+        "codemode": false,
+        "timeout": {
+          "startup": 60000,
+          "catalog": 60000
+        }
+      }
+    }
+  }
+}

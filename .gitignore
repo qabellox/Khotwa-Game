@@ -4,3 +4,4 @@
 *.log
 dist/
 khotwa/build/
+.opencode/memory/
