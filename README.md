@@ -31,16 +31,20 @@ built artifacts.
 
 ## Deploy
 
-`dist/web` is a plain static site. From inside `dist/web`:
+**Just push to `main`.** Nothing else is required, from any device:
 
-```powershell
-vercel deploy --prod --yes --non-interactive
-```
+1. A push to `main` starts the **Web build** workflow (`.github/workflows/web-build.yml`).
+2. It exports the game with Godot 4.7.2 and force-pushes the result to the `web-build` branch.
+3. Vercel watches `web-build` as its production branch and deploys it to
+   https://khotwa-preview.vercel.app/ automatically.
 
-The project is hosted in Vercel project `khotwa-preview` under the `port-nova` team.
-Link the folder once, then deploy:
+You never touch `web-build`; it is generated output. `main` stays clean source.
 
-```powershell
-vercel link --project khotwa-preview --scope port-nova --yes
-vercel deploy --prod --yes --non-interactive
-```
+Notes:
+
+- CI uses `tools/godot-templates/web_nothreads_release.zip` so it never downloads the full
+  1.2 GB export-template archive.
+- A build takes about 30 seconds. Progress: https://github.com/qabellox/Khotwa-Game/actions
+- To rebuild without changing code, run the workflow manually from the Actions tab.
+- Manual deploy from `dist/web` still works for emergencies: `vercel deploy --prod`.
+
