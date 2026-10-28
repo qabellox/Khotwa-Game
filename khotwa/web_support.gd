@@ -82,6 +82,10 @@ func _register_js_start() -> void:
 func _show_start_screen_html() -> void:
 	if not OS.has_feature("web"):
 		return
+	# Ensure we're in MENU state
+	var manager = _manager()
+	if manager != null:
+		manager.set("state", 0)
 	if not _in_menu():
 		return
 	var js_code = "
